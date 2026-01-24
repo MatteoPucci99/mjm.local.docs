@@ -1,76 +1,184 @@
-# mjm.local.docs
+# AGENTS.md - mjm.local.docs
 
-## Descrizione
+Local MCP Server for semantic document search via embeddings. Built with .NET 10, Microsoft Semantic Kernel, and Blazor Server.
 
-Server MCP locale per archiviazione e ricerca di documentazione tramite embeddings.
+## Quick Reference
 
-## Obiettivo
+| Item | Value |
+|------|-------|
+| SDK | .NET 10.0.102 |
+| Solution | `mjm.local.docs/mjm.local.docs.sln` |
+| Test Framework | xUnit 2.9.3 |
+| MCP Endpoint | `/mcp` |
+| Dev URL | `http://localhost:5024` |
 
-Collegare client MCP per recuperare informazioni di progetto tramite ricerca semantica.
+## Build Commands
 
-## Stack Tecnologico
+```bash
+cd mjm.local.docs
 
-- **Linguaggio**: C# / .NET 8+
-- **Framework AI**: Microsoft Semantic Kernel
-- **Astrazioni**: Microsoft.Extensions.VectorData.Abstractions
-- **Vector Store**:
-  - SQLite con sqlite-vec (produzione locale) - NuGet: `Microsoft.SemanticKernel.Connectors.SqliteVec`
-  - In-Memory (test/dev)
-- **Embeddings**: Astrazioni SK con supporto multi-provider
+dotnet restore                 # Restore dependencies
+dotnet build                   # Build all projects
+dotnet run --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj   # Run server
+dotnet watch --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj # Hot reload
+```
 
-## Architettura
+## Test Commands
 
-### Componenti principali
+```bash
+cd mjm.local.docs
 
-1. **MCP Server** - Endpoint MCP per client esterni
-2. **Document Processor** - Ingestion e chunking documenti
-3. **Embedding Service** - Astrazione per generazione embeddings (via SK)
-4. **Vector Store** - Storage e ricerca semantica (SQLite + sqlite-vec)
+dotnet test                                                    # Run all tests
+dotnet test --filter "FullyQualifiedName~TestMethodName"       # Single test by name
+dotnet test --filter "FullyQualifiedName~ClassName"            # All tests in class
+dotnet test --logger "console;verbosity=detailed"              # Verbose output
+dotnet test --collect:"XPlat Code Coverage"                    # With coverage
+```
 
-### Provider Embeddings supportati (via Semantic Kernel)
-
-- OpenAI
-- Azure OpenAI
-- Ollama (completamente locale)
-- Hugging Face
-
-### Capacita ricerca vettoriale SQLite
-
-- Funzioni distanza: Cosine, Manhattan, Euclidean
-- Vettori in tabelle virtuali (prefisso `vec_`)
-- Filtri: EqualTo
-- Note: No hybrid search (solo vector search pura)
-
-## Struttura Progetto
+## Project Structure
 
 ```
 mjm.local.docs/
-├── src/
-│   ├── Core/           # Astrazioni e interfacce
-│   ├── Embeddings/     # Implementazioni embedding providers
-│   ├── VectorStore/    # Implementazioni storage
-│   ├── McpServer/      # Server MCP
-│   └── Documents/      # Processamento documenti
-├── tests/
-└── docs/
+├── mjm.local.docs/
+│   ├── mjm.local.docs.sln
+│   ├── global.json
+│   ├── src/
+│   │   ├── Mjm.LocalDocs.Core/           # Abstractions, models (no external deps)
+│   │   ├── Mjm.LocalDocs.Infrastructure/ # Implementations (embeddings, vector store)
+│   │   └── Mjm.LocalDocs.Server/         # MCP Server + Blazor Web App
+│   └── tests/
+│       └── Mjm.LocalDocs.Tests/          # xUnit tests
 ```
 
-## Tools MCP esposti
+## Code Style
 
-- `search_docs` - Ricerca semantica nella documentazione
-- `add_document` - Aggiunta nuovo documento
-- `list_collections` - Elenco collezioni disponibili
+### Namespaces and Imports
 
-## NuGet Packages necessari
+- **File-scoped namespaces** (single line with semicolon)
+- `ImplicitUsings` enabled - common System namespaces auto-imported
+- Order: System > third-party > project namespaces
 
-- Microsoft.SemanticKernel
-- Microsoft.SemanticKernel.Connectors.SqliteVec
-- Microsoft.Extensions.VectorData.Abstractions
-- (opzionale) Microsoft.SemanticKernel.Connectors.Ollama
+```csharp
+using System.ComponentModel;
+using ModelContextProtocol.Server;
+using Mjm.LocalDocs.Core.Services;
 
-## Note evolutive
+namespace Mjm.LocalDocs.Server.McpTools;
+```
 
-Per hybrid search (vector + keyword) in futuro, considerare:
+### Naming Conventions
 
-- Qdrant (Docker locale, UI dashboard)
-- PostgreSQL con pgvector
+| Element | Convention | Example |
+|---------|------------|---------|
+| Interfaces | `I` prefix | `IDocumentRepository` |
+| Async methods | `Async` suffix | `SearchAsync` |
+| Private fields | `_camelCase` | `_repository` |
+| Parameters | `camelCase` | `queryEmbedding` |
+| Properties | `PascalCase` | `DocumentId` |
+
+### Classes and Types
+
+- Use `sealed` on implementation classes
+- Use `required` on required init-only properties
+- Prefer `init` over `set` for immutable models
+- Use primary constructors or traditional constructors for DI
+
+```csharp
+public sealed class DocumentChunk
+{
+    public required string Id { get; init; }
+    public required string Content { get; init; }
+    public string? Title { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+```
+
+### Async/Await
+
+- All async methods must have `Async` suffix
+- Always accept `CancellationToken cancellationToken = default` as last parameter
+- Never use `.Result` or `.Wait()` - always await
+
+```csharp
+public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+    ReadOnlyMemory<float> queryEmbedding,
+    string? collection = null,
+    int limit = 10,
+    CancellationToken cancellationToken = default)
+```
+
+### XML Documentation
+
+- Document all public types, methods, and properties
+- Use `<inheritdoc />` for interface implementations
+
+```csharp
+/// <summary>
+/// Searches for chunks similar to the query embedding.
+/// </summary>
+/// <param name="queryEmbedding">The query embedding vector.</param>
+/// <returns>Search results ordered by relevance.</returns>
+Task<IReadOnlyList<SearchResult>> SearchAsync(...);
+```
+
+### Nullable Reference Types
+
+- `Nullable` enabled project-wide
+- Use `?` for nullable: `string? collection = null`
+- Check with `string.IsNullOrEmpty()`
+- Use `!` sparingly and only when certain
+
+### Collections and Error Handling
+
+- Return `IReadOnlyList<T>` for read-only collections
+- Use `IEnumerable<T>` for input parameters
+- Use collection expressions: `[]` instead of `new List<T>()`
+- Return early for edge cases
+- Use `Math.Clamp()` for range validation
+
+```csharp
+if (chunks.Count == 0)
+    return;
+
+limit = Math.Clamp(limit, 1, 20);
+```
+
+## Architecture
+
+### Clean Architecture Layers
+
+1. **Core** - Domain models, interfaces (no external dependencies)
+2. **Infrastructure** - Implementations of Core interfaces
+3. **Server** - Composition root, MCP tools, Web UI
+
+### Dependency Injection
+
+Register via extension methods in `DependencyInjection/` folders:
+- `AddLocalDocsCoreServices()` - core services
+- `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, no API key)
+
+### MCP Tools
+
+Decorate with `[McpServerToolType]` and `[McpServerTool]`:
+
+```csharp
+[McpServerToolType]
+public sealed class SearchDocsTool
+{
+    [McpServerTool(Name = "search_docs")]
+    [Description("Search for documents using semantic search.")]
+    public async Task<string> SearchDocsAsync(
+        [Description("The search query")] string query,
+        CancellationToken cancellationToken = default)
+    { ... }
+}
+```
+
+## Key Packages
+
+| Package | Purpose |
+|---------|---------|
+| Microsoft.SemanticKernel | AI/ML orchestration |
+| Microsoft.Extensions.VectorData.Abstractions | Vector data interfaces |
+| ModelContextProtocol.AspNetCore | MCP server for ASP.NET Core |
+| xunit | Testing framework |
