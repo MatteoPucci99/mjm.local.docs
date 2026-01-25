@@ -1,0 +1,139 @@
+@page "/projects"
+@rendermode InteractiveServer
+@using Mjm.LocalDocs.Core.Abstractions
+@using Mjm.LocalDocs.Core.Models
+@inject IProjectRepository ProjectRepository
+@inject IDocumentRepository DocumentRepository
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Progetti - Local Docs</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Progetti</MudText>
+    <MudButton Variant="Variant.Filled" 
+               Color="Color.Primary" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="@(() => Navigation.NavigateTo("/projects/new"))">
+        Nuovo Progetto
+    </MudButton>
+</div>
+
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="mx-auto d-block my-8" />
+}
+else if (_projects.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">
+        Non ci sono progetti. Clicca su "Nuovo Progetto" per crearne uno.
+    </MudAlert>
+}
+else
+{
+    <MudTable Items="@_projects" 
+              Hover="true" 
+              Striped="true"
+              Dense="false"
+              Breakpoint="Breakpoint.Sm"
+              Loading="@_loading"
+              LoadingProgressColor="Color.Primary">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>Descrizione</MudTh>
+            <MudTh Style="width: 120px;">Documenti</MudTh>
+            <MudTh Style="width: 180px;">Creato</MudTh>
+            <MudTh Style="width: 140px;">Azioni</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">
+                <MudLink Href="@($"/projects/{context.Project.Id}")" Typo="Typo.body1" Color="Color.Primary">
+                    @context.Project.Name
+                </MudLink>
+            </MudTd>
+            <MudTd DataLabel="Descrizione">
+                <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    @(context.Project.Description ?? "-")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Documenti">
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">@context.DocumentCount</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Creato">
+                <MudText Typo="Typo.body2">@context.Project.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Azioni">
+                <MudTooltip Text="Modifica">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                   Size="Size.Small" 
+                                   Color="Color.Primary"
+                                   OnClick="@(() => Navigation.NavigateTo($"/projects/{context.Project.Id}"))" />
+                </MudTooltip>
+                <MudTooltip Text="Elimina">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                   Size="Size.Small" 
+                                   Color="Color.Error"
+                                   OnClick="@(() => DeleteProjectAsync(context.Project))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private bool _loading = true;
+    private List<ProjectListItem> _projects = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjectsAsync();
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        
+        var projects = await ProjectRepository.GetAllAsync();
+        _projects.Clear();
+
+        foreach (var project in projects.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt))
+        {
+            var docs = await DocumentRepository.GetDocumentsByProjectAsync(project.Id);
+            _projects.Add(new ProjectListItem(project, docs.Count));
+        }
+
+        _loading = false;
+    }
+
+    private async Task DeleteProjectAsync(Project project)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Sei sicuro di voler eliminare il progetto \"{project.Name}\"? Verranno eliminati anche tutti i documenti e i dati associati." },
+            { x => x.ButtonText, "Elimina" },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Conferma Eliminazione", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            var deleted = await ProjectRepository.DeleteAsync(project.Id);
+            if (deleted)
+            {
+                Snackbar.Add($"Progetto \"{project.Name}\" eliminato con successo.", Severity.Success);
+                await LoadProjectsAsync();
+            }
+            else
+            {
+                Snackbar.Add("Errore durante l'eliminazione del progetto.", Severity.Error);
+            }
+        }
+    }
+
+    private sealed record ProjectListItem(Project Project, int DocumentCount);
+}
