@@ -23,24 +23,11 @@ builder.Services
 // Add LocalDocs services
 builder.Services.AddLocalDocsCoreServices();
 
-// Add Infrastructure services
-// For development: use fake embeddings (no external API needed)
-// For production: configure a real embedding provider
-if (builder.Environment.IsDevelopment())
-{
-    // Fake embeddings for local development
-    builder.Services.AddLocalDocsFakeInfrastructure();
-}
-else
-{
-    // TODO: Configure real embedding provider for production
-    // Example with OpenAI:
-    // var embeddingGenerator = new OpenAIClient(apiKey).AsEmbeddingGenerator("text-embedding-3-small");
-    // builder.Services.AddLocalDocsInMemoryInfrastructure(embeddingGenerator);
-
-    // For now, fallback to fake in non-dev environments too
-    builder.Services.AddLocalDocsFakeInfrastructure();
-}
+// Add Infrastructure services - configured from appsettings.json
+// See LocalDocs:Embeddings section for provider configuration (Fake, OpenAI)
+// See LocalDocs:Storage section for storage configuration (InMemory, Sqlite)
+var connectionString = builder.Configuration.GetConnectionString("LocalDocs");
+builder.Services.AddLocalDocsInfrastructure(builder.Configuration, connectionString);
 
 var app = builder.Build();
 

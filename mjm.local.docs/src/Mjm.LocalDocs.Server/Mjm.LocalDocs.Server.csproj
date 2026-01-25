@@ -14,6 +14,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>8ef649af-010c-4434-8adc-98da93e2e355</UserSecretsId>
   </PropertyGroup>
 
 </Project>

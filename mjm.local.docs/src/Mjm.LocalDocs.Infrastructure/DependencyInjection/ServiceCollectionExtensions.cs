@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Mjm.LocalDocs.Core.Abstractions;
+using Mjm.LocalDocs.Core.Configuration;
 using Mjm.LocalDocs.Infrastructure.Documents;
 using Mjm.LocalDocs.Infrastructure.Embeddings;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 using Mjm.LocalDocs.Infrastructure.Persistence.Repositories;
 using Mjm.LocalDocs.Infrastructure.VectorStore;
+using OpenAI;
 
 namespace Mjm.LocalDocs.Infrastructure.DependencyInjection;
 
@@ -15,6 +18,106 @@ namespace Mjm.LocalDocs.Infrastructure.DependencyInjection;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds infrastructure services configured from appsettings.json.
+    /// Reads the "LocalDocs" section for embedding and storage provider configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <param name="connectionString">Optional SQLite connection string. Required when using SQLite storage.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when OpenAI provider is configured but API key is missing,
+    /// or when SQLite storage is configured but connection string is missing.
+    /// </exception>
+    public static IServiceCollection AddLocalDocsInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string? connectionString = null)
+    {
+        var options = new LocalDocsOptions();
+        configuration.GetSection(LocalDocsOptions.SectionName).Bind(options);
+
+        // Configure storage
+        ConfigureStorage(services, options.Storage, connectionString, options.Embeddings.Dimension);
+
+        // Configure embeddings
+        ConfigureEmbeddings(services, options.Embeddings);
+
+        // Processing services
+        services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
+
+        return services;
+    }
+
+    private static void ConfigureStorage(
+        IServiceCollection services,
+        StorageOptions storageOptions,
+        string? connectionString,
+        int embeddingDimension)
+    {
+        switch (storageOptions.Provider)
+        {
+            case StorageProvider.Sqlite:
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    throw new InvalidOperationException(
+                        "SQLite storage requires a connection string. " +
+                        "Configure 'ConnectionStrings:LocalDocs' in appsettings.json.");
+                }
+
+                services.AddDbContext<LocalDocsDbContext>(options =>
+                    options.UseSqlite(connectionString));
+
+                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
+                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                services.AddSingleton<IVectorStore>(sp =>
+                    new SqliteVectorStore(connectionString, embeddingDimension));
+                break;
+
+            case StorageProvider.InMemory:
+            default:
+                services.AddSingleton<IProjectRepository, InMemoryProjectRepository>();
+                services.AddSingleton<IDocumentRepository, InMemoryDocumentRepository>();
+                services.AddSingleton<IVectorStore, InMemoryVectorStore>();
+                break;
+        }
+    }
+
+    private static void ConfigureEmbeddings(
+        IServiceCollection services,
+        EmbeddingsOptions embeddingsOptions)
+    {
+        switch (embeddingsOptions.Provider)
+        {
+            case EmbeddingProvider.OpenAI:
+                var apiKey = embeddingsOptions.OpenAI.ApiKey
+                    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    throw new InvalidOperationException(
+                        "OpenAI embedding provider requires an API key. " +
+                        "Configure 'LocalDocs:Embeddings:OpenAI:ApiKey' in appsettings.json " +
+                        "or set the OPENAI_API_KEY environment variable.");
+                }
+
+                var openAiClient = new OpenAIClient(apiKey);
+                var embeddingGenerator = openAiClient.GetEmbeddingClient(embeddingsOptions.OpenAI.Model)
+                    .AsIEmbeddingGenerator();
+
+                services.AddSingleton<IEmbeddingService>(
+                    new SemanticKernelEmbeddingService(embeddingGenerator, embeddingsOptions.Dimension));
+                break;
+
+            case EmbeddingProvider.Fake:
+            default:
+                services.AddSingleton<IEmbeddingService>(
+                    new FakeEmbeddingService(embeddingsOptions.Dimension));
+                break;
+        }
+    }
+
     /// <summary>
     /// Adds infrastructure services with SQLite persistence.
     /// </summary>
