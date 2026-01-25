@@ -24,25 +24,25 @@ public sealed class SimpleDocumentProcessor : IDocumentProcessor
 
     /// <inheritdoc />
     public Task<IReadOnlyList<DocumentChunk>> ChunkDocumentAsync(
-        Document document, 
+        Document document,
         CancellationToken cancellationToken = default)
     {
         var chunks = new List<DocumentChunk>();
-        var content = document.Content;
+        var content = document.ExtractedText;
 
         if (string.IsNullOrWhiteSpace(content))
             return Task.FromResult<IReadOnlyList<DocumentChunk>>(chunks);
 
         // Split by double newlines (paragraphs) first
         var paragraphs = content.Split(["\n\n", "\r\n\r\n"], StringSplitOptions.RemoveEmptyEntries);
-        
+
         var currentChunk = "";
         var chunkIndex = 0;
 
         foreach (var paragraph in paragraphs)
         {
             var trimmedParagraph = paragraph.Trim();
-            
+
             if (string.IsNullOrEmpty(trimmedParagraph))
                 continue;
 
@@ -50,10 +50,10 @@ public sealed class SimpleDocumentProcessor : IDocumentProcessor
             if (currentChunk.Length + trimmedParagraph.Length > _maxChunkSize && currentChunk.Length > 0)
             {
                 chunks.Add(CreateChunk(document, currentChunk.Trim(), chunkIndex++));
-                
+
                 // Keep overlap from previous chunk
-                currentChunk = currentChunk.Length > _overlapSize 
-                    ? currentChunk[^_overlapSize..] 
+                currentChunk = currentChunk.Length > _overlapSize
+                    ? currentChunk[^_overlapSize..]
                     : "";
             }
 
@@ -84,8 +84,7 @@ public sealed class SimpleDocumentProcessor : IDocumentProcessor
             Id = $"{document.Id}_chunk_{index}",
             Content = content,
             DocumentId = document.Id,
-            Collection = document.Collection,
-            Title = document.Title,
+            FileName = document.FileName,
             ChunkIndex = index,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -95,7 +94,7 @@ public sealed class SimpleDocumentProcessor : IDocumentProcessor
     {
         // Try to split at sentence boundary
         var searchStart = Math.Min(maxLength, text.Length) - 1;
-        
+
         for (var i = searchStart; i > maxLength / 2; i--)
         {
             if (text[i] == '.' || text[i] == '!' || text[i] == '?')

@@ -11,19 +11,39 @@ public sealed class Document
     public required string Id { get; init; }
 
     /// <summary>
-    /// Document title or filename.
+    /// The project this document belongs to.
     /// </summary>
-    public required string Title { get; init; }
+    public required string ProjectId { get; init; }
 
     /// <summary>
-    /// Full text content of the document.
+    /// Original file name (e.g., "FRD_Progetto1_v1.5.txt").
     /// </summary>
-    public required string Content { get; init; }
+    public required string FileName { get; init; }
 
     /// <summary>
-    /// Collection/category for organizing documents.
+    /// File extension (e.g., ".txt", ".pdf", ".docx").
     /// </summary>
-    public required string Collection { get; init; }
+    public required string FileExtension { get; init; }
+
+    /// <summary>
+    /// Original file content as binary data.
+    /// </summary>
+    public required byte[] FileContent { get; init; }
+
+    /// <summary>
+    /// Size of the file in bytes.
+    /// </summary>
+    public required long FileSizeBytes { get; init; }
+
+    /// <summary>
+    /// Extracted text content used for chunking and search.
+    /// </summary>
+    public required string ExtractedText { get; init; }
+
+    /// <summary>
+    /// SHA256 hash of the file content for deduplication.
+    /// </summary>
+    public string? ContentHash { get; init; }
 
     /// <summary>
     /// Optional metadata as key-value pairs.

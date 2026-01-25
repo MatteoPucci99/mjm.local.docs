@@ -5,70 +5,146 @@ using Mjm.LocalDocs.Core.Models;
 namespace Mjm.LocalDocs.Infrastructure.VectorStore;
 
 /// <summary>
-/// Simple in-memory implementation of document repository for development/testing.
-/// Uses brute-force cosine similarity search.
+/// In-memory implementation of document repository for development/testing.
 /// </summary>
 public sealed class InMemoryDocumentRepository : IDocumentRepository
 {
+    private readonly ConcurrentDictionary<string, Document> _documents = new();
     private readonly ConcurrentDictionary<string, DocumentChunk> _chunks = new();
-    private readonly HashSet<string> _knownCollections = [];
-    private readonly object _collectionLock = new();
+
+    #region Document Operations
+
+    /// <inheritdoc />
+    public Task<Document> AddDocumentAsync(
+        Document document,
+        CancellationToken cancellationToken = default)
+    {
+        _documents[document.Id] = document;
+        return Task.FromResult(document);
+    }
+
+    /// <inheritdoc />
+    public Task<Document?> GetDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        _documents.TryGetValue(documentId, out var document);
+        return Task.FromResult(document);
+    }
+
+    /// <inheritdoc />
+    public Task<byte[]?> GetDocumentFileAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_documents.TryGetValue(documentId, out var document))
+        {
+            return Task.FromResult<byte[]?>(document.FileContent);
+        }
+        return Task.FromResult<byte[]?>(null);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Document>> GetDocumentsByProjectAsync(
+        string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var documents = _documents.Values
+            .Where(d => d.ProjectId == projectId)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<Document>>(documents);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> DeleteDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        // Delete chunks first
+        var chunkKeysToRemove = _chunks
+            .Where(kvp => kvp.Value.DocumentId == documentId)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in chunkKeysToRemove)
+        {
+            _chunks.TryRemove(key, out _);
+        }
+
+        return Task.FromResult(_documents.TryRemove(documentId, out _));
+    }
+
+    /// <inheritdoc />
+    public Task<bool> DocumentExistsAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_documents.ContainsKey(documentId));
+    }
+
+    /// <inheritdoc />
+    public Task<Document?> GetDocumentByHashAsync(
+        string projectId,
+        string contentHash,
+        CancellationToken cancellationToken = default)
+    {
+        var document = _documents.Values
+            .FirstOrDefault(d => d.ProjectId == projectId && d.ContentHash == contentHash);
+        return Task.FromResult(document);
+    }
+
+    #endregion
+
+    #region Chunk Operations
 
     /// <inheritdoc />
     public Task AddChunksAsync(
-        IEnumerable<DocumentChunk> chunks, 
+        IEnumerable<DocumentChunk> chunks,
         CancellationToken cancellationToken = default)
     {
         foreach (var chunk in chunks)
         {
             _chunks[chunk.Id] = chunk;
-            
-            lock (_collectionLock)
-            {
-                _knownCollections.Add(chunk.Collection);
-            }
         }
-
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<SearchResult>> SearchAsync(
-        ReadOnlyMemory<float> queryEmbedding,
-        string? collection = null,
-        int limit = 10,
+    public Task<DocumentChunk?> GetChunkAsync(
+        string chunkId,
         CancellationToken cancellationToken = default)
     {
-        var results = new List<(DocumentChunk Chunk, double Score)>();
-        
-        foreach (var chunk in _chunks.Values)
-        {
-            if (!chunk.Embedding.HasValue)
-                continue;
-                
-            if (!string.IsNullOrEmpty(collection) && chunk.Collection != collection)
-                continue;
-
-            var score = CosineSimilarity(queryEmbedding.Span, chunk.Embedding.Value.Span);
-            results.Add((chunk, score));
-        }
-
-        var searchResults = results
-            .OrderByDescending(x => x.Score)
-            .Take(limit)
-            .Select(x => new SearchResult
-            {
-                Chunk = x.Chunk,
-                Score = x.Score
-            })
-            .ToList();
-
-        return Task.FromResult<IReadOnlyList<SearchResult>>(searchResults);
+        _chunks.TryGetValue(chunkId, out var chunk);
+        return Task.FromResult(chunk);
     }
 
     /// <inheritdoc />
-    public Task DeleteDocumentAsync(
-        string documentId, 
+    public Task<IReadOnlyList<DocumentChunk>> GetChunksByDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var chunks = _chunks.Values
+            .Where(c => c.DocumentId == documentId)
+            .OrderBy(c => c.ChunkIndex)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<DocumentChunk>>(chunks);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<DocumentChunk>> GetChunksByIdsAsync(
+        IEnumerable<string> chunkIds,
+        CancellationToken cancellationToken = default)
+    {
+        var idSet = chunkIds.ToHashSet();
+        var chunks = _chunks.Values
+            .Where(c => idSet.Contains(c.Id))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<DocumentChunk>>(chunks);
+    }
+
+    /// <inheritdoc />
+    public Task DeleteChunksByDocumentAsync(
+        string documentId,
         CancellationToken cancellationToken = default)
     {
         var keysToRemove = _chunks
@@ -84,48 +160,50 @@ public sealed class InMemoryDocumentRepository : IDocumentRepository
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
-    public Task<IReadOnlyList<string>> GetCollectionsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        lock (_collectionLock)
-        {
-            return Task.FromResult<IReadOnlyList<string>>(_knownCollections.ToList());
-        }
-    }
+    #endregion
+
+    #region Project Operations
 
     /// <inheritdoc />
-    public Task<bool> CollectionExistsAsync(
-        string collection, 
+    public Task<IReadOnlyList<string>> GetProjectsWithDocumentsAsync(
         CancellationToken cancellationToken = default)
     {
-        lock (_collectionLock)
-        {
-            return Task.FromResult(_knownCollections.Contains(collection));
-        }
+        var projectIds = _documents.Values
+            .Select(d => d.ProjectId)
+            .Distinct()
+            .ToList();
+        return Task.FromResult<IReadOnlyList<string>>(projectIds);
     }
 
-    /// <summary>
-    /// Computes cosine similarity between two vectors.
-    /// </summary>
-    private static double CosineSimilarity(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+    /// <inheritdoc />
+    public Task DeleteDocumentsByProjectAsync(
+        string projectId,
+        CancellationToken cancellationToken = default)
     {
-        if (a.Length != b.Length)
-            return 0;
+        var documentIds = _documents.Values
+            .Where(d => d.ProjectId == projectId)
+            .Select(d => d.Id)
+            .ToList();
 
-        double dotProduct = 0;
-        double magnitudeA = 0;
-        double magnitudeB = 0;
-
-        for (int i = 0; i < a.Length; i++)
+        foreach (var documentId in documentIds)
         {
-            dotProduct += a[i] * b[i];
-            magnitudeA += a[i] * a[i];
-            magnitudeB += b[i] * b[i];
+            // Delete chunks
+            var chunkKeysToRemove = _chunks
+                .Where(kvp => kvp.Value.DocumentId == documentId)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var key in chunkKeysToRemove)
+            {
+                _chunks.TryRemove(key, out _);
+            }
+
+            // Delete document
+            _documents.TryRemove(documentId, out _);
         }
 
-        var magnitude = Math.Sqrt(magnitudeA) * Math.Sqrt(magnitudeB);
-        
-        return magnitude == 0 ? 0 : dotProduct / magnitude;
+        return Task.CompletedTask;
     }
+
+    #endregion
 }

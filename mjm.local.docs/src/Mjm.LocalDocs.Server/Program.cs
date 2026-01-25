@@ -14,9 +14,11 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
-    .WithTools<SearchDocsTool>()
+    .WithTools<ProjectTools>()
     .WithTools<AddDocumentTool>()
-    .WithTools<ListCollectionsTool>();
+    .WithTools<DocumentTools>()
+    .WithTools<ListProjectsTool>()
+    .WithTools<SearchDocsTool>();
 
 // Add LocalDocs services
 builder.Services.AddLocalDocsCoreServices();
@@ -35,7 +37,7 @@ else
     // Example with OpenAI:
     // var embeddingGenerator = new OpenAIClient(apiKey).AsEmbeddingGenerator("text-embedding-3-small");
     // builder.Services.AddLocalDocsInMemoryInfrastructure(embeddingGenerator);
-    
+
     // For now, fallback to fake in non-dev environments too
     builder.Services.AddLocalDocsFakeInfrastructure();
 }
