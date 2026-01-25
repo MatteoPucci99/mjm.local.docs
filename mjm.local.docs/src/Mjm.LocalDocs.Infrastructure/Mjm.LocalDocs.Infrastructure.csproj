@@ -21,6 +21,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="sqlite-vec" Version="0.1.7-alpha.2.1" />
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <PackageReference Include="NPOI" Version="2.7.4" />
   </ItemGroup>
 
 </Project>

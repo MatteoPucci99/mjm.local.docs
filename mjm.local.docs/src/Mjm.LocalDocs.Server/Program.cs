@@ -52,7 +52,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+// HTTPS redirect only for non-MCP requests (MCP tools connect via HTTP)
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/mcp"),
+    appBuilder => appBuilder.UseHttpsRedirection());
+
 app.UseAntiforgery();
 
 // Map MCP endpoint

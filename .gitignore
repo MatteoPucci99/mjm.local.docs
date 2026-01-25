@@ -418,3 +418,6 @@ FodyWeavers.xsd
 *.msp
 mjm.local.docs/.idea
 nul
+mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db
+mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db-shm
+mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db-wal

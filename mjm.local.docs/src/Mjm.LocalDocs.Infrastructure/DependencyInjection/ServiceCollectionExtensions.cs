@@ -47,7 +47,26 @@ public static class ServiceCollectionExtensions
         // Processing services
         services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
 
+        // Document readers
+        AddDocumentReaders(services);
+
         return services;
+    }
+
+    private static void AddDocumentReaders(IServiceCollection services)
+    {
+        // Register individual readers
+        services.AddSingleton<PlainTextDocumentReader>();
+        services.AddSingleton<PdfDocumentReader>();
+        services.AddSingleton<WordDocumentReader>();
+
+        // Register composite reader that aggregates all readers
+        services.AddSingleton<CompositeDocumentReader>(sp => new CompositeDocumentReader(
+        [
+            sp.GetRequiredService<PlainTextDocumentReader>(),
+            sp.GetRequiredService<PdfDocumentReader>(),
+            sp.GetRequiredService<WordDocumentReader>()
+        ]));
     }
 
     private static void ConfigureStorage(
@@ -148,6 +167,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEmbeddingService>(
             new SemanticKernelEmbeddingService(embeddingGenerator, embeddingDimension));
 
+        // Document readers
+        AddDocumentReaders(services);
+
         return services;
     }
 
@@ -179,6 +201,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
         services.AddSingleton<IEmbeddingService>(new FakeEmbeddingService(embeddingDimension));
 
+        // Document readers
+        AddDocumentReaders(services);
+
         return services;
     }
 
@@ -200,6 +225,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEmbeddingService>(
             new SemanticKernelEmbeddingService(embeddingGenerator, embeddingDimension));
 
+        // Document readers
+        AddDocumentReaders(services);
+
         return services;
     }
 
@@ -220,6 +248,9 @@ public static class ServiceCollectionExtensions
         // Processing services
         services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
         services.AddSingleton<IEmbeddingService>(new FakeEmbeddingService(embeddingDimension));
+
+        // Document readers
+        AddDocumentReaders(services);
 
         return services;
     }
@@ -244,6 +275,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
         services.AddSingleton<IEmbeddingService>(
             new SemanticKernelEmbeddingService(embeddingGenerator, embeddingDimension));
+
+        // Document readers
+        AddDocumentReaders(services);
 
         return services;
     }

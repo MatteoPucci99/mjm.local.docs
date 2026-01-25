@@ -8,7 +8,7 @@ Local MCP Server for semantic document search via embeddings. Built with .NET 10
 |------|-------|
 | SDK | .NET 10.0.102 |
 | Solution | `mjm.local.docs/mjm.local.docs.sln` |
-| Test Framework | xUnit 2.9.3 |
+| Test Framework | xUnit 2.9.3 + NSubstitute 5.3.0 |
 | MCP Endpoint | `/mcp` |
 | Dev URL | `http://localhost:5024` |
 
@@ -39,15 +39,13 @@ dotnet test --collect:"XPlat Code Coverage"                    # With coverage
 
 ```
 mjm.local.docs/
-├── mjm.local.docs/
-│   ├── mjm.local.docs.sln
-│   ├── global.json
-│   ├── src/
-│   │   ├── Mjm.LocalDocs.Core/           # Abstractions, models (no external deps)
-│   │   ├── Mjm.LocalDocs.Infrastructure/ # Implementations (embeddings, vector store)
-│   │   └── Mjm.LocalDocs.Server/         # MCP Server + Blazor Web App
-│   └── tests/
-│       └── Mjm.LocalDocs.Tests/          # xUnit tests
+├── mjm.local.docs.sln
+├── src/
+│   ├── Mjm.LocalDocs.Core/           # Abstractions, models (no external deps)
+│   ├── Mjm.LocalDocs.Infrastructure/ # Implementations (embeddings, vector store)
+│   └── Mjm.LocalDocs.Server/         # MCP Server + Blazor Web App
+└── tests/
+    └── Mjm.LocalDocs.Tests/          # xUnit tests
 ```
 
 ## Code Style
@@ -75,6 +73,7 @@ namespace Mjm.LocalDocs.Server.McpTools;
 | Private fields | `_camelCase` | `_repository` |
 | Parameters | `camelCase` | `queryEmbedding` |
 | Properties | `PascalCase` | `DocumentId` |
+| Test methods | `MethodName_Scenario_ExpectedResult` | `SearchAsync_WithNoResults_ReturnsEmptyList` |
 
 ### Classes and Types
 
@@ -99,27 +98,10 @@ public sealed class DocumentChunk
 - Always accept `CancellationToken cancellationToken = default` as last parameter
 - Never use `.Result` or `.Wait()` - always await
 
-```csharp
-public async Task<IReadOnlyList<SearchResult>> SearchAsync(
-    ReadOnlyMemory<float> queryEmbedding,
-    string? collection = null,
-    int limit = 10,
-    CancellationToken cancellationToken = default)
-```
-
 ### XML Documentation
 
 - Document all public types, methods, and properties
 - Use `<inheritdoc />` for interface implementations
-
-```csharp
-/// <summary>
-/// Searches for chunks similar to the query embedding.
-/// </summary>
-/// <param name="queryEmbedding">The query embedding vector.</param>
-/// <returns>Search results ordered by relevance.</returns>
-Task<IReadOnlyList<SearchResult>> SearchAsync(...);
-```
 
 ### Nullable Reference Types
 
@@ -133,15 +115,14 @@ Task<IReadOnlyList<SearchResult>> SearchAsync(...);
 - Return `IReadOnlyList<T>` for read-only collections
 - Use `IEnumerable<T>` for input parameters
 - Use collection expressions: `[]` instead of `new List<T>()`
-- Return early for edge cases
-- Use `Math.Clamp()` for range validation
+- Return early for edge cases: `if (chunks.Count == 0) return [];`
 
-```csharp
-if (chunks.Count == 0)
-    return;
+### Test Patterns
 
-limit = Math.Clamp(limit, 1, 20);
-```
+- Use `#region` blocks to group related tests by method
+- Create helper methods: `CreateTestDocument()`, `CreateTestChunk()`
+- Use Arrange-Act-Assert pattern with comments
+- Name SUT variable `_sut` (System Under Test)
 
 ## Architecture
 
@@ -159,7 +140,7 @@ Register via extension methods in `DependencyInjection/` folders:
 
 ### MCP Tools
 
-Decorate with `[McpServerToolType]` and `[McpServerTool]`:
+Decorate tool classes with `[McpServerToolType]` and methods with `[McpServerTool]`:
 
 ```csharp
 [McpServerToolType]
@@ -169,8 +150,7 @@ public sealed class SearchDocsTool
     [Description("Search for documents using semantic search.")]
     public async Task<string> SearchDocsAsync(
         [Description("The search query")] string query,
-        CancellationToken cancellationToken = default)
-    { ... }
+        CancellationToken cancellationToken = default) { ... }
 }
 ```
 
@@ -181,4 +161,5 @@ public sealed class SearchDocsTool
 | Microsoft.SemanticKernel | AI/ML orchestration |
 | Microsoft.Extensions.VectorData.Abstractions | Vector data interfaces |
 | ModelContextProtocol.AspNetCore | MCP server for ASP.NET Core |
-| xunit | Testing framework |
+| Microsoft.EntityFrameworkCore.Sqlite | SQLite persistence |
+| xunit + NSubstitute | Testing and mocking |
