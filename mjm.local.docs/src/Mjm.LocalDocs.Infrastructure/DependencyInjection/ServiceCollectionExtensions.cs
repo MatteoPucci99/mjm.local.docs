@@ -9,6 +9,7 @@ using Mjm.LocalDocs.Infrastructure.Embeddings;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 using Mjm.LocalDocs.Infrastructure.Persistence.Repositories;
 using Mjm.LocalDocs.Infrastructure.VectorStore;
+using Mjm.LocalDocs.Infrastructure.VectorStore.Hnsw;
 using OpenAI;
 
 namespace Mjm.LocalDocs.Infrastructure.DependencyInjection;
@@ -92,6 +93,32 @@ public static class ServiceCollectionExtensions
                 services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
                 services.AddSingleton<IVectorStore>(sp =>
                     new SqliteVectorStore(connectionString, embeddingDimension));
+                break;
+
+            case StorageProvider.SqliteHnsw:
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    throw new InvalidOperationException(
+                        "SQLite+HNSW storage requires a connection string. " +
+                        "Configure 'ConnectionStrings:LocalDocs' in appsettings.json.");
+                }
+
+                services.AddDbContext<LocalDocsDbContext>(options =>
+                    options.UseSqlite(connectionString));
+
+                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
+                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                
+                // Use HNSW for vector search instead of brute-force SQLite
+                services.AddSingleton<IVectorStore>(sp =>
+                    new HnswVectorStore(new HnswVectorStore.Options
+                    {
+                        IndexPath = storageOptions.Hnsw.IndexPath,
+                        MaxConnections = storageOptions.Hnsw.MaxConnections,
+                        EfConstruction = storageOptions.Hnsw.EfConstruction,
+                        EfSearch = storageOptions.Hnsw.EfSearch,
+                        AutoSaveDelayMs = storageOptions.Hnsw.AutoSaveDelayMs
+                    }));
                 break;
 
             case StorageProvider.InMemory:

@@ -83,6 +83,45 @@ public sealed class StorageOptions
     /// The storage provider to use.
     /// </summary>
     public StorageProvider Provider { get; init; } = StorageProvider.InMemory;
+
+    /// <summary>
+    /// HNSW-specific configuration (used when Provider is Hnsw or SqliteHnsw).
+    /// </summary>
+    public HnswOptions Hnsw { get; init; } = new();
+}
+
+/// <summary>
+/// Configuration options for HNSW vector index.
+/// </summary>
+public sealed class HnswOptions
+{
+    /// <summary>
+    /// Path to the HNSW index file.
+    /// </summary>
+    public string IndexPath { get; init; } = "hnsw_index.bin";
+
+    /// <summary>
+    /// Maximum connections per node (M parameter).
+    /// Higher values improve recall but increase memory. Recommended: 12-48.
+    /// </summary>
+    public int MaxConnections { get; init; } = 16;
+
+    /// <summary>
+    /// Size of dynamic candidate list during construction.
+    /// Higher values improve quality but slow construction. Recommended: 100-500.
+    /// </summary>
+    public int EfConstruction { get; init; } = 200;
+
+    /// <summary>
+    /// Size of dynamic candidate list during search.
+    /// Higher values improve recall but slow search. Recommended: 50-500.
+    /// </summary>
+    public int EfSearch { get; init; } = 50;
+
+    /// <summary>
+    /// Auto-save delay in milliseconds. Set to 0 to disable.
+    /// </summary>
+    public int AutoSaveDelayMs { get; init; } = 5000;
 }
 
 /// <summary>
@@ -96,7 +135,13 @@ public enum StorageProvider
     InMemory,
 
     /// <summary>
-    /// SQLite persistent storage.
+    /// SQLite persistent storage with brute-force vector search.
     /// </summary>
-    Sqlite
+    Sqlite,
+
+    /// <summary>
+    /// SQLite for metadata + HNSW for fast approximate vector search.
+    /// Recommended for datasets with 10,000+ documents.
+    /// </summary>
+    SqliteHnsw
 }

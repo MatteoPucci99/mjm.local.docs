@@ -6,8 +6,10 @@
 @using Mjm.LocalDocs.Core.Abstractions
 @using Mjm.LocalDocs.Core.Models
 @using Mjm.LocalDocs.Core.Services
+@using Mjm.LocalDocs.Infrastructure.Documents
 @inject IProjectRepository ProjectRepository
 @inject DocumentService DocumentService
+@inject CompositeDocumentReader DocumentReader
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -100,7 +102,7 @@ else
                 <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                                FilesChanged="OnFilesChanged"
                                MaximumFileCount="10"
-                               Accept=".txt,.md,.pdf,.docx,.doc,.html,.htm,.json,.xml,.csv"
+                               Accept=".txt,.md,.pdf,.docx,.html,.htm,.json,.xml,.csv"
                                Class="mb-4">
                     <ActivatorContent>
                         <MudPaper Outlined="true" 
@@ -118,7 +120,7 @@ else
                                     Trascina i file qui o clicca per selezionare
                                 </MudText>
                                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                                    Formati supportati: .txt, .md, .pdf, .docx, .doc, .html, .json, .xml, .csv
+                                    Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
                                 </MudText>
                             }
                         </MudPaper>
@@ -352,8 +354,24 @@ else
                 await stream.CopyToAsync(memoryStream);
                 var fileContent = memoryStream.ToArray();
 
-                // Extract text based on file type
-                var extractedText = await ExtractTextAsync(file.Name, fileContent);
+                // Extract text based on file type using the appropriate reader
+                var fileExtension = Path.GetExtension(file.Name).ToLowerInvariant();
+                string extractedText;
+                
+                if (DocumentReader.CanRead(fileExtension))
+                {
+                    var extractionResult = await DocumentReader.ExtractTextAsync(fileContent, fileExtension);
+                    if (!extractionResult.Success)
+                    {
+                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Estrazione testo fallita");
+                    }
+                    extractedText = extractionResult.Text;
+                }
+                else
+                {
+                    // Fallback per formati testuali non gestiti dal CompositeDocumentReader
+                    extractedText = Encoding.UTF8.GetString(fileContent);
+                }
                 
                 // Compute content hash
                 var contentHash = ComputeHash(fileContent);
@@ -390,21 +408,6 @@ else
         {
             Snackbar.Add($"{successCount} documento/i caricato/i con successo!", Severity.Success);
         }
-    }
-
-    private static async Task<string> ExtractTextAsync(string fileName, byte[] content)
-    {
-        var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        
-        // For text-based files, read directly
-        if (extension is ".txt" or ".md" or ".json" or ".xml" or ".csv" or ".html" or ".htm")
-        {
-            return Encoding.UTF8.GetString(content);
-        }
-        
-        // For binary files (PDF, DOCX, etc.), return placeholder
-        // In production, you'd use libraries like PdfPig, DocumentFormat.OpenXml, etc.
-        return $"[Contenuto binario di {fileName} - estrazione testo non implementata per {extension}]";
     }
 
     private static string ComputeHash(byte[] content)
