@@ -28,11 +28,20 @@ dotnet watch --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj # Ho
 ```bash
 cd mjm.local.docs
 
-dotnet test                                                    # Run all tests
-dotnet test --filter "FullyQualifiedName~TestMethodName"       # Single test by name
-dotnet test --filter "FullyQualifiedName~ClassName"            # All tests in class
-dotnet test --logger "console;verbosity=detailed"              # Verbose output
-dotnet test --collect:"XPlat Code Coverage"                    # With coverage
+# Run all tests
+dotnet test
+
+# Run single test by method name
+dotnet test --filter "FullyQualifiedName~SearchAsync_WithNoVectorResults_ReturnsEmptyList"
+
+# Run all tests in a class
+dotnet test --filter "FullyQualifiedName~DocumentServiceTests"
+
+# Run tests with verbose output
+dotnet test --logger "console;verbosity=detailed"
+
+# Run tests with coverage
+dotnet test --collect:"XPlat Code Coverage"
 ```
 
 ## Project Structure
@@ -40,10 +49,18 @@ dotnet test --collect:"XPlat Code Coverage"                    # With coverage
 ```
 mjm.local.docs/
 ├── mjm.local.docs.sln
+├── global.json                       # SDK version pinned to 10.0.102
 ├── src/
 │   ├── Mjm.LocalDocs.Core/           # Abstractions, models (no external deps)
+│   │   ├── Abstractions/             # IDocumentRepository, IVectorStore, etc.
+│   │   ├── Models/                   # Document, DocumentChunk, SearchResult
+│   │   └── Services/                 # DocumentService
 │   ├── Mjm.LocalDocs.Infrastructure/ # Implementations (embeddings, vector store)
+│   │   ├── Documents/                # PDF, Word, PlainText readers
+│   │   ├── Embeddings/               # Fake and SemanticKernel implementations
+│   │   └── Persistence/              # SQLite repositories
 │   └── Mjm.LocalDocs.Server/         # MCP Server + Blazor Web App
+│       └── McpTools/                 # MCP tool classes
 └── tests/
     └── Mjm.LocalDocs.Tests/          # xUnit tests
 ```
@@ -123,6 +140,23 @@ public sealed class DocumentChunk
 - Create helper methods: `CreateTestDocument()`, `CreateTestChunk()`
 - Use Arrange-Act-Assert pattern with comments
 - Name SUT variable `_sut` (System Under Test)
+- Mock dependencies with `Substitute.For<T>()`
+
+```csharp
+[Fact]
+public async Task SearchAsync_WithNoResults_ReturnsEmptyList()
+{
+    // Arrange
+    _vectorStore.SearchAsync(Arg.Any<ReadOnlyMemory<float>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        .Returns(new List<VectorSearchResult>());
+
+    // Act
+    var results = await _sut.SearchAsync("query");
+
+    // Assert
+    Assert.Empty(results);
+}
+```
 
 ## Architecture
 
@@ -136,7 +170,8 @@ public sealed class DocumentChunk
 
 Register via extension methods in `DependencyInjection/` folders:
 - `AddLocalDocsCoreServices()` - core services
-- `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, no API key)
+- `AddLocalDocsInfrastructure()` - configurable via appsettings.json
+- `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, in-memory storage)
 
 ### MCP Tools
 
@@ -146,10 +181,18 @@ Decorate tool classes with `[McpServerToolType]` and methods with `[McpServerToo
 [McpServerToolType]
 public sealed class SearchDocsTool
 {
+    private readonly DocumentService _documentService;
+
+    public SearchDocsTool(DocumentService documentService)
+    {
+        _documentService = documentService;
+    }
+
     [McpServerTool(Name = "search_docs")]
     [Description("Search for documents using semantic search.")]
     public async Task<string> SearchDocsAsync(
         [Description("The search query")] string query,
+        [Description("Optional project filter")] string? projectId = null,
         CancellationToken cancellationToken = default) { ... }
 }
 ```
