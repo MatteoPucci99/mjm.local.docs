@@ -91,8 +91,8 @@ public static class ServiceCollectionExtensions
                 services.AddDbContext<LocalDocsDbContext>(options =>
                     options.UseSqlite(connectionString));
 
-                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
-                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
+                services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 services.AddSingleton<IVectorStore>(sp =>
                     new SqliteVectorStore(connectionString, embeddingDimension));
                 break;
@@ -108,8 +108,8 @@ public static class ServiceCollectionExtensions
                 services.AddDbContext<LocalDocsDbContext>(options =>
                     options.UseSqlite(connectionString));
 
-                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
-                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
+                services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
 
                 // Use HNSW for vector search instead of brute-force SQLite
                 services.AddSingleton<IVectorStore>(sp =>
@@ -136,8 +136,8 @@ public static class ServiceCollectionExtensions
                 services.AddDbContext<LocalDocsDbContext>(options =>
                     options.UseSqlServer(sqlServerConnectionString));
 
-                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
-                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
+                services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 
                 // Use raw SQL vector store with separate chunk_embeddings table
                 services.AddSingleton<IVectorStore>(sp =>
@@ -205,8 +205,8 @@ public static class ServiceCollectionExtensions
             options.UseSqlite(connectionString));
 
         // Repositories
-        services.AddScoped<IProjectRepository, SqliteProjectRepository>();
-        services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+        services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
+        services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
         
         // Vector store (singleton with its own connection)
         services.AddSingleton<IVectorStore>(sp =>
@@ -240,8 +240,8 @@ public static class ServiceCollectionExtensions
             options.UseSqlite(connectionString));
 
         // Repositories
-        services.AddScoped<IProjectRepository, SqliteProjectRepository>();
-        services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+        services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
+        services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
         
         // Vector store (singleton with its own connection)
         services.AddSingleton<IVectorStore>(sp =>

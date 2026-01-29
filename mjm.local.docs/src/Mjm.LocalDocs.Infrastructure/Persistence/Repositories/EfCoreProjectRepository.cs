@@ -6,13 +6,14 @@ using Mjm.LocalDocs.Infrastructure.Persistence.Entities;
 namespace Mjm.LocalDocs.Infrastructure.Persistence.Repositories;
 
 /// <summary>
-/// SQLite implementation of project repository using EF Core.
+/// EF Core implementation of project repository.
+/// Supports SQLite, SQL Server, and other EF Core providers.
 /// </summary>
-public sealed class SqliteProjectRepository : IProjectRepository
+public sealed class EfCoreProjectRepository : IProjectRepository
 {
     private readonly LocalDocsDbContext _context;
 
-    public SqliteProjectRepository(LocalDocsDbContext context)
+    public EfCoreProjectRepository(LocalDocsDbContext context)
     {
         _context = context;
     }
