@@ -132,19 +132,16 @@ public static class ServiceCollectionExtensions
                         "Configure 'ConnectionStrings:SqlServer' in appsettings.json.");
                 }
 
+                // Use SQL Server/Azure SQL
                 services.AddDbContext<LocalDocsDbContext>(options =>
                     options.UseSqlServer(sqlServerConnectionString));
 
                 services.AddScoped<IProjectRepository, SqliteProjectRepository>();
                 services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                
+                // Use raw SQL vector store with separate chunk_embeddings table
                 services.AddSingleton<IVectorStore>(sp =>
-                    new SqlServerVectorStore(
-                        sqlServerConnectionString,
-                        embeddingDimension,
-                        storageOptions.SqlServer.Schema,
-                        storageOptions.SqlServer.TableName,
-                        storageOptions.SqlServer.UseVectorIndex,
-                        storageOptions.SqlServer.DistanceMetric));
+                    new SqlServerVectorStore(sqlServerConnectionString, embeddingDimension));
                 break;
 
             case StorageProvider.InMemory:

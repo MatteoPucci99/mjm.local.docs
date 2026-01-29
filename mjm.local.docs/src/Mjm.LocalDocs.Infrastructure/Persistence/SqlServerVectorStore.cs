@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using Mjm.LocalDocs.Core.Abstractions;
@@ -5,95 +6,24 @@ using Mjm.LocalDocs.Core.Abstractions;
 namespace Mjm.LocalDocs.Infrastructure.Persistence;
 
 /// <summary>
-/// SQL Server implementation of vector store using native VECTOR type and VECTOR_SEARCH.
-/// Requires SQL Server 2025+, Azure SQL Database, or Azure SQL Managed Instance.
-/// Uses DiskANN-based vector index for approximate nearest neighbor (ANN) search.
+/// SQL Server/Azure SQL vector store implementation using raw SQL.
+/// Stores embeddings in a separate chunk_embeddings table with native VECTOR type.
+/// Uses string-formatted vectors for inserts (e.g., '[0.1, 0.2, 0.3]').
 /// </summary>
-public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
+public sealed class SqlServerVectorStore : IVectorStore
 {
     private readonly string _connectionString;
-    private readonly int _embeddingDimension;
-    private readonly string _schema;
-    private readonly string _tableName;
-    private readonly bool _useVectorIndex;
+    private readonly int _dimension;
     private readonly string _distanceMetric;
-    private SqlConnection? _connection;
-    private bool _initialized;
 
     public SqlServerVectorStore(
         string connectionString,
-        int embeddingDimension = 1536,
-        string schema = "dbo",
-        string tableName = "chunk_embeddings",
-        bool useVectorIndex = true,
+        int dimension = 1536,
         string distanceMetric = "cosine")
     {
         _connectionString = connectionString;
-        _embeddingDimension = embeddingDimension;
-        _schema = schema;
-        _tableName = tableName;
-        _useVectorIndex = useVectorIndex;
+        _dimension = dimension;
         _distanceMetric = distanceMetric;
-    }
-
-    private async Task<SqlConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
-    {
-        if (_connection != null && _connection.State == System.Data.ConnectionState.Open)
-        {
-            return _connection;
-        }
-
-        _connection = new SqlConnection(_connectionString);
-        await _connection.OpenAsync(cancellationToken);
-        return _connection;
-    }
-
-    private async Task EnsureInitializedAsync(CancellationToken cancellationToken = default)
-    {
-        if (_initialized)
-        {
-            return;
-        }
-
-        var conn = await GetConnectionAsync(cancellationToken);
-        
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
-        
-        var createTableSql = $"""
-            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '{_tableName}' AND schema_id = SCHEMA_ID('{_schema}'))
-                BEGIN
-                    CREATE TABLE [{escapedSchema}].[{escapedTableName}] (
-                        chunk_id NVARCHAR(255) PRIMARY KEY,
-                        embedding VECTOR({_embeddingDimension}) NOT NULL
-                    );
-                END
-            """;
-
-        await using (var createTableCmd = new SqlCommand(createTableSql, conn))
-        {
-            await createTableCmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        if (_useVectorIndex)
-        {
-            var indexName = $"vec_idx_{_tableName}";
-            var createIndexSql = $"""
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{indexName}' AND object_id = OBJECT_ID('[{escapedSchema}].[{escapedTableName}]'))
-                BEGIN
-                    CREATE VECTOR INDEX [{indexName}] 
-                    ON [{escapedSchema}].[{escapedTableName}](embedding)
-                    WITH (metric = '{_distanceMetric}');
-                END
-                """;
-
-            await using (var createIndexCmd = new SqlCommand(createIndexSql, conn))
-            {
-                await createIndexCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-        }
-
-        _initialized = true;
     }
 
     /// <inheritdoc />
@@ -102,24 +32,28 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         ReadOnlyMemory<float> embedding,
         CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var conn = await GetConnectionAsync(cancellationToken);
+        var vectorString = EmbeddingToString(embedding.Span);
 
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
 
+        // Use MERGE for upsert
         var sql = $"""
-            MERGE [{escapedSchema}].[{escapedTableName}] AS target
-            USING (SELECT @chunkId AS chunk_id, CAST(@embedding AS VECTOR({_embeddingDimension})) AS embedding) AS source
+            MERGE INTO chunk_embeddings AS target
+            USING (SELECT @chunkId AS chunk_id) AS source
             ON target.chunk_id = source.chunk_id
-            WHEN MATCHED THEN UPDATE SET embedding = source.embedding
-            WHEN NOT MATCHED THEN INSERT (chunk_id, embedding) VALUES (source.chunk_id, source.embedding);
+            WHEN MATCHED THEN
+                UPDATE SET embedding = CAST(@embedding AS VECTOR({_dimension}))
+            WHEN NOT MATCHED THEN
+                INSERT (chunk_id, embedding)
+                VALUES (@chunkId, CAST(@embedding AS VECTOR({_dimension})));
             """;
 
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@chunkId", chunkId);
-        cmd.Parameters.AddWithValue("@embedding", EmbeddingToJson(embedding));
-        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@chunkId", chunkId);
+        command.Parameters.AddWithValue("@embedding", vectorString);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -127,43 +61,59 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         IEnumerable<KeyValuePair<string, ReadOnlyMemory<float>>> embeddings,
         CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var conn = await GetConnectionAsync(cancellationToken);
+        var embeddingsList = embeddings.ToList();
+        if (embeddingsList.Count == 0) return;
 
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-        var sql = $"""
-            MERGE [{escapedSchema}].[{escapedTableName}] AS target
-            USING (SELECT @chunkId AS chunk_id, CAST(@embedding AS VECTOR({_embeddingDimension})) AS embedding) AS source
-            ON target.chunk_id = source.chunk_id
-            WHEN MATCHED THEN UPDATE SET embedding = source.embedding
-            WHEN NOT MATCHED THEN INSERT (chunk_id, embedding) VALUES (source.chunk_id, source.embedding);
-            """;
-
-        await using (var transaction = await conn.BeginTransactionAsync(cancellationToken))
+        // Process in batches to avoid command size limits
+        const int batchSize = 100;
+        foreach (var batch in embeddingsList.Chunk(batchSize))
         {
-            try
-            {
-                foreach (var (chunkId, embedding) in embeddings)
-                {
-                    await using var cmd = new SqlCommand(sql, conn)
-                    {
-                        Transaction = (SqlTransaction)transaction
-                    };
-                    cmd.Parameters.AddWithValue("@chunkId", chunkId);
-                    cmd.Parameters.AddWithValue("@embedding", EmbeddingToJson(embedding));
-                    await cmd.ExecuteNonQueryAsync(cancellationToken);
-                }
-
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
+            await UpsertBatchInternalAsync(connection, batch, cancellationToken);
         }
+    }
+
+    private async Task UpsertBatchInternalAsync(
+        SqlConnection connection,
+        IEnumerable<KeyValuePair<string, ReadOnlyMemory<float>>> batch,
+        CancellationToken cancellationToken)
+    {
+        var batchList = batch.ToList();
+        if (batchList.Count == 0) return;
+
+        // Build a multi-row MERGE statement
+        var sb = new StringBuilder();
+        sb.AppendLine("MERGE INTO chunk_embeddings AS target");
+        sb.AppendLine("USING (VALUES");
+
+        var parameters = new List<SqlParameter>();
+        for (var i = 0; i < batchList.Count; i++)
+        {
+            var (chunkId, embedding) = batchList[i];
+            var vectorString = EmbeddingToString(embedding.Span);
+
+            if (i > 0) sb.AppendLine(",");
+            sb.Append($"    (@chunkId{i}, CAST(@embedding{i} AS VECTOR({_dimension})))");
+
+            parameters.Add(new SqlParameter($"@chunkId{i}", chunkId));
+            parameters.Add(new SqlParameter($"@embedding{i}", vectorString));
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(") AS source (chunk_id, embedding)");
+        sb.AppendLine("ON target.chunk_id = source.chunk_id");
+        sb.AppendLine("WHEN MATCHED THEN");
+        sb.AppendLine("    UPDATE SET embedding = source.embedding");
+        sb.AppendLine("WHEN NOT MATCHED THEN");
+        sb.AppendLine("    INSERT (chunk_id, embedding)");
+        sb.AppendLine("    VALUES (source.chunk_id, source.embedding);");
+
+        await using var command = new SqlCommand(sb.ToString(), connection);
+        command.Parameters.AddRange(parameters.ToArray());
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -171,17 +121,15 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         string chunkId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var conn = await GetConnectionAsync(cancellationToken);
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
+        const string sql = "DELETE FROM chunk_embeddings WHERE chunk_id = @chunkId";
 
-        var sql = $"DELETE FROM [{escapedSchema}].[{escapedTableName}] WHERE chunk_id = @chunkId";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@chunkId", chunkId);
 
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@chunkId", chunkId);
-        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -189,17 +137,16 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         string documentId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var conn = await GetConnectionAsync(cancellationToken);
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
+        // Chunk IDs follow pattern: {documentId}_chunk_{index}
+        const string sql = "DELETE FROM chunk_embeddings WHERE chunk_id LIKE @pattern";
 
-        var sql = $"DELETE FROM [{escapedSchema}].[{escapedTableName}] WHERE chunk_id LIKE @pattern";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@pattern", $"{documentId}_chunk_%");
 
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@pattern", $"{documentId}_chunk_%");
-        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -208,66 +155,35 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         int limit = 10,
         CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var conn = await GetConnectionAsync(cancellationToken);
+        var vectorString = EmbeddingToString(queryEmbedding.Span);
 
-        var escapedSchema = _schema.Replace("]", "]]");
-        var escapedTableName = _tableName.Replace("]", "]]");
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
 
-        List<VectorSearchResult> results;
+        // Use VECTOR_DISTANCE for similarity search
+        var sql = $"""
+            SELECT TOP (@limit) 
+                chunk_id,
+                VECTOR_DISTANCE('{_distanceMetric}', embedding, CAST(@queryEmbedding AS VECTOR({_dimension}))) AS distance
+            FROM chunk_embeddings
+            ORDER BY distance ASC
+            """;
 
-        if (_useVectorIndex)
-        {
-            var sql = $"""
-                SELECT t.chunk_id, s.distance
-                FROM VECTOR_SEARCH(
-                    TABLE = [{escapedSchema}].[{escapedTableName}] AS t,
-                    COLUMN = embedding,
-                    SIMILAR_TO = CAST(@queryEmbedding AS VECTOR({_embeddingDimension})),
-                    METRIC = '{_distanceMetric}',
-                    TOP_N = @limit
-                ) AS s
-                ORDER BY s.distance
-                """;
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@limit", limit);
+        command.Parameters.AddWithValue("@queryEmbedding", vectorString);
 
-            await using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@queryEmbedding", EmbeddingToJson(queryEmbedding));
-            cmd.Parameters.AddWithValue("@limit", limit);
-
-            results = await ReadSearchResultsAsync(cmd, cancellationToken);
-        }
-        else
-        {
-            var sql = $"""
-                SELECT TOP(@limit) chunk_id, 
-                       VECTOR_DISTANCE('{_distanceMetric}', embedding, CAST(@queryEmbedding AS VECTOR({_embeddingDimension}))) AS distance
-                FROM [{escapedSchema}].[{escapedTableName}]
-                ORDER BY distance
-                """;
-
-            await using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@queryEmbedding", EmbeddingToJson(queryEmbedding));
-            cmd.Parameters.AddWithValue("@limit", limit);
-
-            results = await ReadSearchResultsAsync(cmd, cancellationToken);
-        }
-
-        return results;
-    }
-
-    private static async Task<List<VectorSearchResult>> ReadSearchResultsAsync(
-        SqlCommand cmd,
-        CancellationToken cancellationToken)
-    {
         var results = new List<VectorSearchResult>();
-        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
+            var chunkId = reader.GetString(0);
             var distance = reader.GetDouble(1);
+
             results.Add(new VectorSearchResult
             {
-                ChunkId = reader.GetString(0),
+                ChunkId = chunkId,
                 Score = DistanceToSimilarity(distance)
             });
         }
@@ -275,36 +191,31 @@ public sealed class SqlServerVectorStore : IVectorStore, IAsyncDisposable
         return results;
     }
 
-    private static double DistanceToSimilarity(double distance)
+    /// <summary>
+    /// Converts an embedding to a SQL Server vector string format: '[0.1, 0.2, 0.3, ...]'
+    /// </summary>
+    private static string EmbeddingToString(ReadOnlySpan<float> embedding)
     {
-        return 1.0 / (1.0 + distance);
-    }
-
-    private static string EmbeddingToJson(ReadOnlyMemory<float> embedding)
-    {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(embedding.Length * 12); // Estimate size
         sb.Append('[');
 
-        var span = embedding.Span;
-        for (int i = 0; i < span.Length; i++)
+        for (var i = 0; i < embedding.Length; i++)
         {
-            if (i > 0)
-            {
-                sb.Append(',');
-            }
-            sb.Append(span[i].ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (i > 0) sb.Append(',');
+            sb.Append(embedding[i].ToString("G9", CultureInfo.InvariantCulture));
         }
 
         sb.Append(']');
         return sb.ToString();
     }
 
-    public async ValueTask DisposeAsync()
+    /// <summary>
+    /// Converts distance to similarity score (higher = more similar).
+    /// </summary>
+    private static double DistanceToSimilarity(double distance)
     {
-        if (_connection != null)
-        {
-            await _connection.DisposeAsync();
-            _connection = null;
-        }
+        // For cosine distance: similarity = 1 - distance
+        // For euclidean: similarity = 1 / (1 + distance)
+        return 1.0 / (1.0 + distance);
     }
 }

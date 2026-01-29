@@ -2,7 +2,7 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Entities;
 
 /// <summary>
 /// EF Core entity for DocumentChunk.
-/// Embedding is stored separately in sqlite-vec virtual table.
+/// Embeddings are stored separately (sqlite-vec for SQLite, chunk_embeddings table for SQL Server).
 /// </summary>
 public sealed class DocumentChunkEntity
 {

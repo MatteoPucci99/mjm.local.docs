@@ -5,6 +5,7 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence;
 
 /// <summary>
 /// EF Core database context for LocalDocs.
+/// Embeddings are stored separately (sqlite-vec for SQLite, chunk_embeddings table for SQL Server).
 /// </summary>
 public sealed class LocalDocsDbContext : DbContext
 {

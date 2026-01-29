@@ -37,10 +37,19 @@ builder.Services.AddLocalDocsInfrastructure(builder.Configuration, connectionStr
 
 var app = builder.Build();
 
-// Ensure SQLite database is created (when using SQLite storage provider)
+// Ensure database is created (when using SQLite or SQL Server storage provider)
 using (var scope = app.Services.CreateScope())
 {
+    // Try to get DbContext directly (works for SQLite)
     var context = scope.ServiceProvider.GetService<LocalDocsDbContext>();
+    
+    // If not available directly, try via factory (works for SQL Server with pooled factory)
+    if (context is null)
+    {
+        var factory = scope.ServiceProvider.GetService<IDbContextFactory<LocalDocsDbContext>>();
+        context = factory?.CreateDbContext();
+    }
+    
     context?.Database.EnsureCreated();
 }
 
