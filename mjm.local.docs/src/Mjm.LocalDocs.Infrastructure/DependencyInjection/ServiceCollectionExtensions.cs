@@ -40,13 +40,14 @@ public static class ServiceCollectionExtensions
         configuration.GetSection(LocalDocsOptions.SectionName).Bind(options);
 
         // Configure storage
-        ConfigureStorage(services, options.Storage, connectionString, options.Embeddings.Dimension);
+        ConfigureStorage(services, configuration, options.Storage, connectionString, options.Embeddings.Dimension);
 
         // Configure embeddings
         ConfigureEmbeddings(services, options.Embeddings);
 
         // Processing services
-        services.AddSingleton<IDocumentProcessor>(new SimpleDocumentProcessor());
+        services.AddSingleton<IDocumentProcessor>(
+            new SimpleDocumentProcessor(options.Chunking.MaxChunkSize, options.Chunking.OverlapSize));
 
         // Document readers
         AddDocumentReaders(services);
@@ -72,6 +73,7 @@ public static class ServiceCollectionExtensions
 
     private static void ConfigureStorage(
         IServiceCollection services,
+        IConfiguration configuration,
         StorageOptions storageOptions,
         string? connectionString,
         int embeddingDimension)
@@ -108,7 +110,7 @@ public static class ServiceCollectionExtensions
 
                 services.AddScoped<IProjectRepository, SqliteProjectRepository>();
                 services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
-                
+
                 // Use HNSW for vector search instead of brute-force SQLite
                 services.AddSingleton<IVectorStore>(sp =>
                     new HnswVectorStore(new HnswVectorStore.Options
@@ -119,6 +121,30 @@ public static class ServiceCollectionExtensions
                         EfSearch = storageOptions.Hnsw.EfSearch,
                         AutoSaveDelayMs = storageOptions.Hnsw.AutoSaveDelayMs
                     }));
+                break;
+
+            case StorageProvider.SqlServer:
+                var sqlServerConnectionString = configuration.GetConnectionString("SqlServer");
+                if (string.IsNullOrEmpty(sqlServerConnectionString))
+                {
+                    throw new InvalidOperationException(
+                        "SQL Server storage requires a connection string. " +
+                        "Configure 'ConnectionStrings:SqlServer' in appsettings.json.");
+                }
+
+                services.AddDbContext<LocalDocsDbContext>(options =>
+                    options.UseSqlServer(sqlServerConnectionString));
+
+                services.AddScoped<IProjectRepository, SqliteProjectRepository>();
+                services.AddScoped<IDocumentRepository, SqliteDocumentRepository>();
+                services.AddSingleton<IVectorStore>(sp =>
+                    new SqlServerVectorStore(
+                        sqlServerConnectionString,
+                        embeddingDimension,
+                        storageOptions.SqlServer.Schema,
+                        storageOptions.SqlServer.TableName,
+                        storageOptions.SqlServer.UseVectorIndex,
+                        storageOptions.SqlServer.DistanceMetric));
                 break;
 
             case StorageProvider.InMemory:

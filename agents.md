@@ -173,6 +173,55 @@ Register via extension methods in `DependencyInjection/` folders:
 - `AddLocalDocsInfrastructure()` - configurable via appsettings.json
 - `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, in-memory storage)
 
+### Storage Providers
+
+| Provider | Description | Vector Search |
+|-----------|-------------|---------------|
+| InMemory | In-memory only (no persistence) | Brute-force O(n) |
+| Sqlite | SQLite database | Brute-force O(n) |
+| SqliteHnsw | SQLite + HNSW index | Approximate O(log n) |
+| SqlServer | SQL Server / Azure SQL | ANN via VECTOR_SEARCH (DiskANN) |
+
+### SQL Server Vector Store
+
+Uses native `VECTOR(n)` type with DiskANN-based approximate nearest neighbor search.
+
+**Configuration:**
+```json
+{
+  "ConnectionStrings": {
+    "SqlServer": "Server=myserver.database.windows.net;Database=localdocs;..."
+  },
+  "LocalDocs": {
+    "Storage": {
+      "Provider": "SqlServer",
+      "SqlServer": {
+        "Schema": "dbo",
+        "TableName": "chunk_embeddings",
+        "UseVectorIndex": true,
+        "DistanceMetric": "cosine"
+      }
+    }
+  }
+}
+```
+
+**SQL Schema:**
+```sql
+CREATE TABLE [dbo].[chunk_embeddings] (
+    chunk_id NVARCHAR(255) PRIMARY KEY,
+    embedding VECTOR(1536) NOT NULL
+);
+
+CREATE VECTOR INDEX vec_idx_chunk_embeddings 
+ON [dbo].[chunk_embeddings](embedding)
+WITH (metric = 'cosine');
+```
+
+**Requirements:**
+- SQL Server 2025+, Azure SQL Database, or Azure SQL Managed Instance
+- Package: `Microsoft.EntityFrameworkCore.SqlServer`
+
 ### MCP Tools
 
 Decorate tool classes with `[McpServerToolType]` and methods with `[McpServerTool]`:

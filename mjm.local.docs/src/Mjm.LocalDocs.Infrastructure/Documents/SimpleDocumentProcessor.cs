@@ -14,9 +14,9 @@ public sealed class SimpleDocumentProcessor : IDocumentProcessor
     /// <summary>
     /// Creates a new document processor.
     /// </summary>
-    /// <param name="maxChunkSize">Maximum characters per chunk (default 1000).</param>
-    /// <param name="overlapSize">Overlap between chunks for context (default 100).</param>
-    public SimpleDocumentProcessor(int maxChunkSize = 1000, int overlapSize = 100)
+    /// <param name="maxChunkSize">Maximum characters per chunk (default 3000).</param>
+    /// <param name="overlapSize">Overlap between chunks for context (default 300).</param>
+    public SimpleDocumentProcessor(int maxChunkSize = 3000, int overlapSize = 300)
     {
         _maxChunkSize = maxChunkSize;
         _overlapSize = overlapSize;

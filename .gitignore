@@ -421,3 +421,8 @@ nul
 mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db
 mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db-shm
 mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db-wal
+
+# User secrets and local dev settings with credentials
+appsettings.Development.json
+appsettings.*.local.json
+*.local.json
