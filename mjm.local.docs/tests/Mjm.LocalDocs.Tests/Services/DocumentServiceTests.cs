@@ -312,13 +312,23 @@ public sealed class DocumentServiceTests
     #region GetDocumentFileAsync Tests
 
     [Fact]
-    public async Task GetDocumentFileAsync_WhenExists_ReturnsFileContent()
+    public async Task GetDocumentFileAsync_WhenDocumentHasInlineContent_ReturnsFileContent()
     {
         // Arrange
         var documentId = "doc-1";
         var fileContent = "Test file content"u8.ToArray();
-        _repository.GetDocumentFileAsync(documentId, Arg.Any<CancellationToken>())
-            .Returns(fileContent);
+        var document = new Document
+        {
+            Id = documentId,
+            ProjectId = "proj-1",
+            FileName = "test.txt",
+            FileExtension = ".txt",
+            FileContent = fileContent, // Inline content (legacy/database storage)
+            FileSizeBytes = fileContent.Length,
+            ExtractedText = "Test"
+        };
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(document);
 
         // Act
         var result = await _sut.GetDocumentFileAsync(documentId);
@@ -333,14 +343,44 @@ public sealed class DocumentServiceTests
     {
         // Arrange
         var documentId = "non-existent-doc";
-        _repository.GetDocumentFileAsync(documentId, Arg.Any<CancellationToken>())
-            .Returns((byte[]?)null);
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns((Document?)null);
 
         // Act
         var result = await _sut.GetDocumentFileAsync(documentId);
 
         // Assert
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetDocumentFileAsync_WhenNoInlineContent_FallsBackToRepository()
+    {
+        // Arrange
+        var documentId = "doc-1";
+        var fileContent = "Test file content"u8.ToArray();
+        var document = new Document
+        {
+            Id = documentId,
+            ProjectId = "proj-1",
+            FileName = "test.txt",
+            FileExtension = ".txt",
+            FileContent = null, // No inline content
+            FileStorageLocation = null, // No external storage location
+            FileSizeBytes = fileContent.Length,
+            ExtractedText = "Test"
+        };
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(document);
+        _repository.GetDocumentFileAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(fileContent);
+
+        // Act
+        var result = await _sut.GetDocumentFileAsync(documentId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileContent, result);
     }
 
     #endregion

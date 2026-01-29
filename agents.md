@@ -173,7 +173,7 @@ Register via extension methods in `DependencyInjection/` folders:
 - `AddLocalDocsInfrastructure()` - configurable via appsettings.json
 - `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, in-memory storage)
 
-### Storage Providers
+### Storage Providers (Metadata & Embeddings)
 
 | Provider | Description | Vector Search |
 |-----------|-------------|---------------|
@@ -181,6 +181,39 @@ Register via extension methods in `DependencyInjection/` folders:
 | Sqlite | SQLite database | Brute-force O(n) |
 | SqliteHnsw | SQLite + HNSW index | Approximate O(log n) |
 | SqlServer | SQL Server / Azure SQL | ANN via VECTOR_SEARCH (DiskANN) |
+
+### File Storage Providers (Document Content)
+
+| Provider | Description | Path Structure |
+|----------|-------------|----------------|
+| Database | Store file content inline in database (default) | N/A (stored in Documents table) |
+| FileSystem | Store files on local disk or network share | `{BasePath}/{ProjectId}/{DocumentId}.{ext}` |
+| AzureBlob | Store files in Azure Blob Storage | `{ContainerName}/{ProjectId}/{DocumentId}.{ext}` |
+
+**Configuration:**
+```json
+{
+  "LocalDocs": {
+    "FileStorage": {
+      "Provider": "FileSystem",
+      "FileSystem": {
+        "BasePath": "./DocumentFiles",
+        "CreateDirectoryIfNotExists": true
+      },
+      "AzureBlob": {
+        "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...",
+        "ContainerName": "documents",
+        "CreateContainerIfNotExists": true
+      }
+    }
+  }
+}
+```
+
+**Backward Compatibility:**
+- Documents with `FileContent` stored inline (legacy) continue to work
+- New documents use the configured provider
+- `FileStorageLocation` property tracks where the file is stored
 
 ### SQL Server Vector Store
 
@@ -254,4 +287,5 @@ public sealed class SearchDocsTool
 | Microsoft.Extensions.VectorData.Abstractions | Vector data interfaces |
 | ModelContextProtocol.AspNetCore | MCP server for ASP.NET Core |
 | Microsoft.EntityFrameworkCore.Sqlite | SQLite persistence |
+| Azure.Storage.Blobs | Azure Blob Storage client |
 | xunit + NSubstitute | Testing and mocking |

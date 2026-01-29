@@ -33,13 +33,17 @@ public sealed class InMemoryDocumentRepository : IDocumentRepository
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// For in-memory storage, this returns the FileContent property.
+    /// If the document uses external storage, FileContent will be null.
+    /// </remarks>
     public Task<byte[]?> GetDocumentFileAsync(
         string documentId,
         CancellationToken cancellationToken = default)
     {
         if (_documents.TryGetValue(documentId, out var document))
         {
-            return Task.FromResult<byte[]?>(document.FileContent);
+            return Task.FromResult(document.FileContent);
         }
         return Task.FromResult<byte[]?>(null);
     }

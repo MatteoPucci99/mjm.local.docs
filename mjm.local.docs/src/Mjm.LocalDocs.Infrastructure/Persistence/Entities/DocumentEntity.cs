@@ -9,7 +9,15 @@ public sealed class DocumentEntity
     public required string ProjectId { get; set; }
     public required string FileName { get; set; }
     public required string FileExtension { get; set; }
-    public required byte[] FileContent { get; set; }
+    /// <summary>
+    /// Original file content. Null when stored externally (FileSystem or Azure Blob).
+    /// </summary>
+    public byte[]? FileContent { get; set; }
+    /// <summary>
+    /// Storage location/path for externally stored files.
+    /// Null for legacy documents where content is stored in FileContent.
+    /// </summary>
+    public string? FileStorageLocation { get; set; }
     public required long FileSizeBytes { get; set; }
     public required string ExtractedText { get; set; }
     public string? ContentHash { get; set; }

@@ -24,6 +24,11 @@ public sealed class LocalDocsOptions
     /// Document chunking configuration.
     /// </summary>
     public ChunkingOptions Chunking { get; init; } = new();
+
+    /// <summary>
+    /// File storage configuration for document content.
+    /// </summary>
+    public FileStorageOptions FileStorage { get; init; } = new();
 }
 
 /// <summary>
@@ -204,4 +209,85 @@ public enum StorageProvider
     /// Requires SQL Server 2025+, Azure SQL Database, or Azure SQL Managed Instance.
     /// </summary>
     SqlServer
+}
+
+/// <summary>
+/// Configuration options for document file storage.
+/// </summary>
+public sealed class FileStorageOptions
+{
+    /// <summary>
+    /// The file storage provider to use for storing document content.
+    /// </summary>
+    public FileStorageProvider Provider { get; init; } = FileStorageProvider.Database;
+
+    /// <summary>
+    /// FileSystem-specific configuration (used when Provider is FileSystem).
+    /// </summary>
+    public FileSystemStorageOptions FileSystem { get; init; } = new();
+
+    /// <summary>
+    /// Azure Blob Storage-specific configuration (used when Provider is AzureBlob).
+    /// </summary>
+    public AzureBlobStorageOptions AzureBlob { get; init; } = new();
+}
+
+/// <summary>
+/// Supported file storage providers.
+/// </summary>
+public enum FileStorageProvider
+{
+    /// <summary>
+    /// Store file content directly in the database (default, legacy behavior).
+    /// </summary>
+    Database,
+
+    /// <summary>
+    /// Store file content on the local file system.
+    /// </summary>
+    FileSystem,
+
+    /// <summary>
+    /// Store file content in Azure Blob Storage.
+    /// </summary>
+    AzureBlob
+}
+
+/// <summary>
+/// Configuration options for file system storage.
+/// </summary>
+public sealed class FileSystemStorageOptions
+{
+    /// <summary>
+    /// Base path where document files will be stored.
+    /// Files are organized as: {BasePath}/{ProjectId}/{DocumentId}.{Extension}
+    /// </summary>
+    public string BasePath { get; init; } = "DocumentFiles";
+
+    /// <summary>
+    /// Create the directory structure if it doesn't exist.
+    /// </summary>
+    public bool CreateDirectoryIfNotExists { get; init; } = true;
+}
+
+/// <summary>
+/// Configuration options for Azure Blob Storage.
+/// </summary>
+public sealed class AzureBlobStorageOptions
+{
+    /// <summary>
+    /// Azure Storage connection string.
+    /// Can also be set via environment variable AZURE_STORAGE_CONNECTION_STRING.
+    /// </summary>
+    public string? ConnectionString { get; init; }
+
+    /// <summary>
+    /// Name of the blob container to store documents.
+    /// </summary>
+    public string ContainerName { get; init; } = "documents";
+
+    /// <summary>
+    /// Create the container if it doesn't exist.
+    /// </summary>
+    public bool CreateContainerIfNotExists { get; init; } = true;
 }

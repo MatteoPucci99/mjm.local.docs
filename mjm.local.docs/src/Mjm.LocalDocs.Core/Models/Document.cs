@@ -27,8 +27,20 @@ public sealed class Document
 
     /// <summary>
     /// Original file content as binary data.
+    /// Null when file is stored externally (FileSystem or Azure Blob).
+    /// For legacy documents, this contains the file content directly in the database.
     /// </summary>
-    public required byte[] FileContent { get; init; }
+    public byte[]? FileContent { get; init; }
+
+    /// <summary>
+    /// Storage location/path for externally stored files.
+    /// Null for legacy documents where content is stored in <see cref="FileContent"/>.
+    /// Format depends on storage provider:
+    /// - FileSystem: relative path like "projectId/documentId.ext"
+    /// - AzureBlob: blob path like "projectId/documentId.ext"
+    /// - Database: null (content is in FileContent)
+    /// </summary>
+    public string? FileStorageLocation { get; init; }
 
     /// <summary>
     /// Size of the file in bytes.

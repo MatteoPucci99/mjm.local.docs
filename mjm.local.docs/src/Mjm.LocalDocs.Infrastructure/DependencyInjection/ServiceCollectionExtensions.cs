@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Mjm.LocalDocs.Core.Abstractions;
 using Mjm.LocalDocs.Core.Configuration;
 using Mjm.LocalDocs.Infrastructure.Documents;
 using Mjm.LocalDocs.Infrastructure.Embeddings;
+using Mjm.LocalDocs.Infrastructure.FileStorage;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 using Mjm.LocalDocs.Infrastructure.Persistence.Repositories;
 using Mjm.LocalDocs.Infrastructure.VectorStore;
@@ -39,8 +42,15 @@ public static class ServiceCollectionExtensions
         var options = new LocalDocsOptions();
         configuration.GetSection(LocalDocsOptions.SectionName).Bind(options);
 
-        // Configure storage
+        // Register options for dependency injection
+        services.TryAddSingleton<IOptions<LocalDocsOptions>>(
+            new OptionsWrapper<LocalDocsOptions>(options));
+
+        // Configure storage (repositories and vector store)
         ConfigureStorage(services, configuration, options.Storage, connectionString, options.Embeddings.Dimension);
+
+        // Configure file storage for document content
+        ConfigureFileStorage(services, options.FileStorage);
 
         // Configure embeddings
         ConfigureEmbeddings(services, options.Embeddings);
@@ -149,6 +159,32 @@ public static class ServiceCollectionExtensions
                 services.AddSingleton<IProjectRepository, InMemoryProjectRepository>();
                 services.AddSingleton<IDocumentRepository, InMemoryDocumentRepository>();
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
+                break;
+        }
+    }
+
+    private static void ConfigureFileStorage(
+        IServiceCollection services,
+        FileStorageOptions fileStorageOptions)
+    {
+        switch (fileStorageOptions.Provider)
+        {
+            case FileStorageProvider.FileSystem:
+                services.AddSingleton<IDocumentFileStorage>(
+                    new FileSystemDocumentFileStorage(fileStorageOptions.FileSystem));
+                break;
+
+            case FileStorageProvider.AzureBlob:
+                services.AddSingleton<IDocumentFileStorage>(
+                    new AzureBlobDocumentFileStorage(fileStorageOptions.AzureBlob));
+                break;
+
+            case FileStorageProvider.Database:
+            default:
+                // For database storage, we need DbContextFactory
+                // Register after DbContext is configured
+                services.AddDbContextFactory<LocalDocsDbContext>();
+                services.AddSingleton<IDocumentFileStorage, DatabaseDocumentFileStorage>();
                 break;
         }
     }

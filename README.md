@@ -77,7 +77,7 @@ See [AGENTS.md](AGENTS.md) for detailed build commands, code style, and architec
 
 ## Storage Configuration
 
-LocalDocs supports multiple storage strategies for vector embeddings. Choose based on your dataset size and performance requirements.
+LocalDocs supports multiple storage strategies for both **vector embeddings** and **document file content**. Choose based on your dataset size and performance requirements.
 
 ### Storage Providers Overview
 
@@ -179,6 +179,33 @@ Combines SQLite for metadata (projects, documents, chunks) with an HNSW (Hierarc
 }
 ```
 
+### SQL Server / Azure SQL
+
+Uses SQL Server's native `VECTOR(n)` type with DiskANN-based approximate nearest neighbor search.
+
+**When to use:** Enterprise deployments, Azure-hosted applications, existing SQL Server infrastructure.
+
+```json
+{
+  "ConnectionStrings": {
+    "SqlServer": "Server=myserver.database.windows.net;Database=localdocs;User ID=admin;Password=...;Encrypt=True;"
+  },
+  "LocalDocs": {
+    "Storage": {
+      "Provider": "SqlServer",
+      "SqlServer": {
+        "Schema": "dbo",
+        "TableName": "chunk_embeddings",
+        "UseVectorIndex": true,
+        "DistanceMetric": "cosine"
+      }
+    }
+  }
+}
+```
+
+**Requirements:** SQL Server 2025+, Azure SQL Database, or Azure SQL Managed Instance.
+
 ### HNSW Parameters Tuning
 
 Fine-tune the HNSW index based on your requirements:
@@ -203,6 +230,125 @@ Fine-tune the HNSW index based on your requirements:
 - **Higher recall needed?** Increase `EfSearch` (costs search speed)
 - **Faster indexing?** Decrease `EfConstruction` (costs index quality)
 - **Memory constrained?** Decrease `MaxConnections` (costs recall)
+
+## File Storage Configuration
+
+LocalDocs supports multiple storage backends for **document file content** (the original uploaded files). This is separate from the vector/metadata storage above.
+
+### File Storage Providers Overview
+
+| Provider | Description | Best For |
+|----------|-------------|----------|
+| `Database` | Store files inline in the database (default) | Small files, simple deployments |
+| `FileSystem` | Store files on local disk or network share | Large files, existing file infrastructure |
+| `AzureBlob` | Store files in Azure Blob Storage | Cloud deployments, scalability |
+
+### Database (Default)
+
+Stores file content directly in the `Documents` table. This is the default behavior and requires no additional configuration.
+
+**Pros:** Simple setup, single database contains everything, transactional consistency.
+
+**Cons:** Database size grows with document count, not ideal for very large files.
+
+```json
+{
+  "LocalDocs": {
+    "FileStorage": {
+      "Provider": "Database"
+    }
+  }
+}
+```
+
+### FileSystem
+
+Stores file content on the local file system. Files are organized by project ID for easy management.
+
+**Directory Structure:**
+```
+{BasePath}/
+├── {ProjectId1}/
+│   ├── {DocumentId1}.pdf
+│   └── {DocumentId2}.docx
+└── {ProjectId2}/
+    └── {DocumentId3}.txt
+```
+
+**Pros:** Efficient for large files, easy to backup/migrate, reduces database size.
+
+**Cons:** Requires file system access, separate backup strategy needed.
+
+```json
+{
+  "LocalDocs": {
+    "FileStorage": {
+      "Provider": "FileSystem",
+      "FileSystem": {
+        "BasePath": "./DocumentFiles",
+        "CreateDirectoryIfNotExists": true
+      }
+    }
+  }
+}
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `BasePath` | `DocumentFiles` | Root directory for file storage |
+| `CreateDirectoryIfNotExists` | `true` | Auto-create directories |
+
+### Azure Blob Storage
+
+Stores file content in Azure Blob Storage. Ideal for cloud deployments and when you need CDN, geo-redundancy, or integration with other Azure services.
+
+**Blob Structure:**
+```
+{ContainerName}/
+├── {ProjectId1}/
+│   ├── {DocumentId1}.pdf
+│   └── {DocumentId2}.docx
+└── {ProjectId2}/
+    └── {DocumentId3}.txt
+```
+
+**Connection String Configuration:**
+
+Option 1: Environment variable (recommended for production):
+```bash
+export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net"
+```
+
+Option 2: Configuration file:
+```json
+{
+  "LocalDocs": {
+    "FileStorage": {
+      "Provider": "AzureBlob",
+      "AzureBlob": {
+        "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net",
+        "ContainerName": "documents",
+        "CreateContainerIfNotExists": true
+      }
+    }
+  }
+}
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `ConnectionString` | - | Azure Storage connection string (or use env var) |
+| `ContainerName` | `documents` | Blob container name |
+| `CreateContainerIfNotExists` | `true` | Auto-create container |
+
+**Security Note:** Never commit connection strings to source control. Use environment variables, Azure Key Vault, or managed identities for production.
+
+### Backward Compatibility
+
+Documents created before configuring an external file storage provider will continue to work:
+- Existing documents with inline `FileContent` are served directly from the database
+- New documents use the configured provider
+- The `FileStorageLocation` property tracks where each document's file is stored
 
 ## Embedding Configuration
 
@@ -307,6 +453,17 @@ Complete `appsettings.json` for a production deployment:
         "EfSearch": 50,
         "AutoSaveDelayMs": 5000
       }
+    },
+    "FileStorage": {
+      "Provider": "AzureBlob",
+      "AzureBlob": {
+        "ContainerName": "documents",
+        "CreateContainerIfNotExists": true
+      }
+    },
+    "Chunking": {
+      "MaxChunkSize": 3000,
+      "OverlapSize": 300
     }
   }
 }
@@ -323,6 +480,13 @@ Complete `appsettings.json` for a production deployment:
     },
     "Storage": {
       "Provider": "SqliteHnsw"
+    },
+    "FileStorage": {
+      "Provider": "FileSystem",
+      "FileSystem": {
+        "BasePath": "./DocumentFiles",
+        "CreateDirectoryIfNotExists": true
+      }
     }
   }
 }

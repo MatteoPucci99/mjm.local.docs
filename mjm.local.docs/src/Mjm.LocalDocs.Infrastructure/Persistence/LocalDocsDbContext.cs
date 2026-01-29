@@ -82,8 +82,12 @@ public sealed class LocalDocsDbContext : DbContext
                 .HasMaxLength(20)
                 .IsRequired();
 
-            entity.Property(e => e.FileContent)
-                .IsRequired();
+            // FileContent is nullable - content may be stored externally
+            entity.Property(e => e.FileContent);
+
+            // FileStorageLocation stores the path/URI for externally stored files
+            entity.Property(e => e.FileStorageLocation)
+                .HasMaxLength(1000);
 
             entity.Property(e => e.FileSizeBytes)
                 .IsRequired();
