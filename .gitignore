@@ -426,3 +426,4 @@ mjm.local.docs/src/Mjm.LocalDocs.Server/localdocs.db-wal
 appsettings.Development.json
 appsettings.*.local.json
 *.local.json
+mjm.local.docs/src/Mjm.LocalDocs.Server/hnsw_index.bin
