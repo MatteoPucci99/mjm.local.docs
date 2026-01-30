@@ -11,6 +11,7 @@ using Mjm.LocalDocs.Infrastructure.Embeddings;
 using Mjm.LocalDocs.Infrastructure.FileStorage;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 using Mjm.LocalDocs.Infrastructure.Persistence.Repositories;
+
 using Mjm.LocalDocs.Infrastructure.VectorStore;
 using Mjm.LocalDocs.Infrastructure.VectorStore.Hnsw;
 using OpenAI;
@@ -98,8 +99,11 @@ public static class ServiceCollectionExtensions
                         "Configure 'ConnectionStrings:LocalDocs' in appsettings.json.");
                 }
 
-                services.AddDbContext<LocalDocsDbContext>(options =>
+                // Use pooled factory for SQLite to support both scoped DbContext and singleton IDbContextFactory
+                services.AddPooledDbContextFactory<LocalDocsDbContext>(options =>
                     options.UseSqlite(connectionString));
+                services.AddScoped(sp => 
+                    sp.GetRequiredService<IDbContextFactory<LocalDocsDbContext>>().CreateDbContext());
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
@@ -115,8 +119,11 @@ public static class ServiceCollectionExtensions
                         "Configure 'ConnectionStrings:LocalDocs' in appsettings.json.");
                 }
 
-                services.AddDbContext<LocalDocsDbContext>(options =>
+                // Use pooled factory for SQLite to support both scoped DbContext and singleton IDbContextFactory
+                services.AddPooledDbContextFactory<LocalDocsDbContext>(options =>
                     options.UseSqlite(connectionString));
+                services.AddScoped(sp => 
+                    sp.GetRequiredService<IDbContextFactory<LocalDocsDbContext>>().CreateDbContext());
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
@@ -182,9 +189,9 @@ public static class ServiceCollectionExtensions
             case FileStorageProvider.Database:
             default:
                 // For database storage, we need DbContextFactory
-                // Register after DbContext is configured
-                services.AddDbContextFactory<LocalDocsDbContext>();
-                services.AddSingleton<IDocumentFileStorage, DatabaseDocumentFileStorage>();
+                // DbContextFactory is already registered by ConfigureStorage when using Sqlite/SqlServer
+                // Only register if not already registered (for InMemory case, this will be a no-op)
+                services.TryAddSingleton<IDocumentFileStorage, DatabaseDocumentFileStorage>();
                 break;
         }
     }

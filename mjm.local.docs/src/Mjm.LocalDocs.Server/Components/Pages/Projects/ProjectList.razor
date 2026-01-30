@@ -1,5 +1,6 @@
- @page "/projects"
- @rendermode InteractiveServer
+@page "/projects"
+@attribute [Authorize]
+@rendermode InteractiveServer
  @using Mjm.LocalDocs.Core.Abstractions
  @using Mjm.LocalDocs.Core.Models
  @inject IProjectRepository ProjectRepository

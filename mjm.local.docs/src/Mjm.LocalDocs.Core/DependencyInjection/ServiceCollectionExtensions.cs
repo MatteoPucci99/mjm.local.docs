@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
                 fileStorage,
                 fileStorageProvider);
         });
+        
         return services;
     }
 }
