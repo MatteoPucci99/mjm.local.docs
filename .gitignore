@@ -427,3 +427,8 @@ appsettings.Development.json
 appsettings.*.local.json
 *.local.json
 mjm.local.docs/src/Mjm.LocalDocs.Server/hnsw_index.bin
+
+# SQLite databases (generic pattern)
+*.db
+*.db-shm
+*.db-wal
