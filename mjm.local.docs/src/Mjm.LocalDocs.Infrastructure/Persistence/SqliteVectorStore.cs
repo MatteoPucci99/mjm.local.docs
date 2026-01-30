@@ -23,6 +23,12 @@ public sealed class SqliteVectorStore : IVectorStore, IDisposable
         _connection.Open();
     }
 
+    /// <inheritdoc />
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Ensures the embeddings table exists.
     /// </summary>

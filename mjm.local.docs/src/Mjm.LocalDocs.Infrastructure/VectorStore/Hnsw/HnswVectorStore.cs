@@ -112,6 +112,13 @@ public sealed class HnswVectorStore : IVectorStore, IDisposable
     }
 
     /// <inheritdoc />
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        // HNSW index is loaded in constructor, no additional initialization needed
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task UpsertAsync(
         string chunkId,
         ReadOnlyMemory<float> embedding,

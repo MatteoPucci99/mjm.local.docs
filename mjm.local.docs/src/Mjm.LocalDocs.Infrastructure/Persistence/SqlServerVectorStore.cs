@@ -27,6 +27,48 @@ public sealed class SqlServerVectorStore : IVectorStore
     }
 
     /// <inheritdoc />
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        // Create table if not exists
+        var createTableSql = $"""
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'chunk_embeddings')
+            BEGIN
+                CREATE TABLE [dbo].[chunk_embeddings] (
+                    chunk_id NVARCHAR(255) PRIMARY KEY,
+                    embedding VECTOR({_dimension}) NOT NULL
+                );
+            END
+            """;
+
+        await using var createTableCmd = new SqlCommand(createTableSql, connection);
+        await createTableCmd.ExecuteNonQueryAsync(cancellationToken);
+
+        // Create vector index if not exists (for approximate nearest neighbor search)
+        var createIndexSql = $"""
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'vec_idx_chunk_embeddings')
+            BEGIN
+                CREATE VECTOR INDEX vec_idx_chunk_embeddings 
+                ON [dbo].[chunk_embeddings](embedding)
+                WITH (metric = '{_distanceMetric}');
+            END
+            """;
+
+        try
+        {
+            await using var createIndexCmd = new SqlCommand(createIndexSql, connection);
+            await createIndexCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (SqlException)
+        {
+            // Vector index creation may fail on some SQL Server versions
+            // The store will still work with exact k-NN search
+        }
+    }
+
+    /// <inheritdoc />
     public async Task UpsertAsync(
         string chunkId,
         ReadOnlyMemory<float> embedding,

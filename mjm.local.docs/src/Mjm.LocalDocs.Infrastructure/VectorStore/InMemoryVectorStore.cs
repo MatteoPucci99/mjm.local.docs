@@ -12,6 +12,13 @@ public sealed class InMemoryVectorStore : IVectorStore
     private readonly ConcurrentDictionary<string, ReadOnlyMemory<float>> _embeddings = new();
 
     /// <inheritdoc />
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        // No initialization needed for in-memory store
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task UpsertAsync(
         string chunkId,
         ReadOnlyMemory<float> embedding,

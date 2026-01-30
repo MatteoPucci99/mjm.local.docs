@@ -223,7 +223,7 @@ Uses native `VECTOR(n)` type with DiskANN-based approximate nearest neighbor sea
 ```json
 {
   "ConnectionStrings": {
-    "SqlServer": "Server=myserver.database.windows.net;Database=localdocs;..."
+    "LocalDocs": "Server=myserver.database.windows.net;Database=localdocs;..."
   },
   "LocalDocs": {
     "Storage": {
@@ -238,6 +238,10 @@ Uses native `VECTOR(n)` type with DiskANN-based approximate nearest neighbor sea
   }
 }
 ```
+
+**Note:** All storage providers (Sqlite, SqliteHnsw, SqlServer) use the same `ConnectionStrings:LocalDocs` key. The connection string format changes based on the provider:
+- **Sqlite/SqliteHnsw:** `Data Source=localdocs.db`
+- **SqlServer:** `Server=myserver.database.windows.net;Database=localdocs;...`
 
 **SQL Schema:**
 ```sql

@@ -48,7 +48,7 @@ public static class ServiceCollectionExtensions
             new OptionsWrapper<LocalDocsOptions>(options));
 
         // Configure storage (repositories and vector store)
-        ConfigureStorage(services, configuration, options.Storage, connectionString, options.Embeddings.Dimension);
+        ConfigureStorage(services, options.Storage, connectionString, options.Embeddings.Dimension);
 
         // Configure file storage for document content
         ConfigureFileStorage(services, options.FileStorage);
@@ -84,7 +84,6 @@ public static class ServiceCollectionExtensions
 
     private static void ConfigureStorage(
         IServiceCollection services,
-        IConfiguration configuration,
         StorageOptions storageOptions,
         string? connectionString,
         int embeddingDimension)
@@ -141,24 +140,25 @@ public static class ServiceCollectionExtensions
                 break;
 
             case StorageProvider.SqlServer:
-                var sqlServerConnectionString = configuration.GetConnectionString("SqlServer");
-                if (string.IsNullOrEmpty(sqlServerConnectionString))
+                if (string.IsNullOrEmpty(connectionString))
                 {
                     throw new InvalidOperationException(
                         "SQL Server storage requires a connection string. " +
-                        "Configure 'ConnectionStrings:SqlServer' in appsettings.json.");
+                        "Configure 'ConnectionStrings:LocalDocs' in appsettings.json.");
                 }
 
-                // Use SQL Server/Azure SQL
-                services.AddDbContext<LocalDocsDbContext>(options =>
-                    options.UseSqlServer(sqlServerConnectionString));
+                // Use pooled factory for SQL Server to support both scoped DbContext and singleton IDbContextFactory
+                services.AddPooledDbContextFactory<LocalDocsDbContext>(options =>
+                    options.UseSqlServer(connectionString));
+                services.AddScoped(sp => 
+                    sp.GetRequiredService<IDbContextFactory<LocalDocsDbContext>>().CreateDbContext());
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 
                 // Use raw SQL vector store with separate chunk_embeddings table
                 services.AddSingleton<IVectorStore>(sp =>
-                    new SqlServerVectorStore(sqlServerConnectionString, embeddingDimension));
+                    new SqlServerVectorStore(connectionString, embeddingDimension));
                 break;
 
             case StorageProvider.InMemory:

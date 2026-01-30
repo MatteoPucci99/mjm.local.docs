@@ -6,6 +6,13 @@ namespace Mjm.LocalDocs.Core.Abstractions;
 public interface IVectorStore
 {
     /// <summary>
+    /// Initializes the vector store (e.g., creates tables, indexes).
+    /// Should be called once at application startup.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task InitializeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Stores or updates an embedding for a chunk.
     /// </summary>
     /// <param name="chunkId">The chunk identifier.</param>

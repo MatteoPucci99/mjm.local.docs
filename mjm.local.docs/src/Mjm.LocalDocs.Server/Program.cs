@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Mjm.LocalDocs.Core.Abstractions;
 using Mjm.LocalDocs.Core.DependencyInjection;
 using LocalDocsAuthOptions = Mjm.LocalDocs.Core.Models.AuthenticationOptions;
 using Mjm.LocalDocs.Infrastructure.DependencyInjection;
@@ -64,9 +65,10 @@ builder.Services.AddLocalDocsInfrastructure(builder.Configuration, connectionStr
 
 var app = builder.Build();
 
-// Ensure database is created (when using SQLite or SQL Server storage provider)
+// Ensure database and vector store are initialized
 using (var scope = app.Services.CreateScope())
 {
+    // Initialize EF Core database (Projects, Documents, DocumentChunks tables)
     // Try to get DbContext directly (works for SQLite)
     var context = scope.ServiceProvider.GetService<LocalDocsDbContext>();
     
@@ -78,6 +80,10 @@ using (var scope = app.Services.CreateScope())
     }
     
     context?.Database.EnsureCreated();
+
+    // Initialize vector store (chunk_embeddings table for SQL Server, etc.)
+    var vectorStore = scope.ServiceProvider.GetRequiredService<IVectorStore>();
+    await vectorStore.InitializeAsync();
 }
 
 // Configure the HTTP request pipeline
