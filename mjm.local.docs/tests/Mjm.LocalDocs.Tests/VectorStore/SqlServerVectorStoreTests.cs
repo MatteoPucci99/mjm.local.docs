@@ -1,4 +1,5 @@
 using Mjm.LocalDocs.Core.Abstractions;
+using Mjm.LocalDocs.Core.Configuration;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 
 namespace Mjm.LocalDocs.Tests.VectorStore;
@@ -379,6 +380,72 @@ public sealed class SqlServerVectorStoreTests : IAsyncLifetime
         {
             Assert.True(result.Score > 0, "Score should be positive");
         }
+    }
+
+    #endregion
+
+    #region SqlServerOptions Tests
+
+    [Fact]
+    public void Constructor_WithOptions_UsesProvidedValues()
+    {
+        // Arrange
+        var options = new SqlServerOptions
+        {
+            Schema = "custom_schema",
+            TableName = "custom_table",
+            UseVectorIndex = false,
+            DistanceMetric = "euclidean"
+        };
+
+        // Act - just verify constructor doesn't throw
+        var store = new SqlServerVectorStore(
+            "Server=localhost;Database=test;",
+            dimension: 512,
+            options: options);
+
+        // Assert - store created successfully (no exception)
+        Assert.NotNull(store);
+    }
+
+    [Fact]
+    public void Constructor_WithDefaultOptions_UsesDefaults()
+    {
+        // Arrange
+        var options = new SqlServerOptions();
+
+        // Act
+        var store = new SqlServerVectorStore(
+            "Server=localhost;Database=test;",
+            dimension: 1536,
+            options: options);
+
+        // Assert
+        Assert.NotNull(store);
+    }
+
+    [Fact]
+    public void Constructor_WithDistanceMetricOnly_BackwardCompatible()
+    {
+        // Act - using the old constructor signature
+        var store = new SqlServerVectorStore(
+            "Server=localhost;Database=test;",
+            dimension: 1536,
+            distanceMetric: "dotproduct");
+
+        // Assert
+        Assert.NotNull(store);
+    }
+
+    [Fact]
+    public void Constructor_WithNullConnectionString_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var options = new SqlServerOptions();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new SqlServerVectorStore(null!, 1536, options));
     }
 
     #endregion

@@ -8,6 +8,7 @@
 @using Mjm.LocalDocs.Core.Models
 @using Mjm.LocalDocs.Core.Services
 @using Mjm.LocalDocs.Infrastructure.Documents
+@using Microsoft.AspNetCore.Components.Forms
 @inject IProjectRepository ProjectRepository
 @inject DocumentService DocumentService
 @inject CompositeDocumentReader DocumentReader
@@ -99,34 +100,34 @@ else
                     <MudText Typo="Typo.h6">Documenti (@_documents.Count)</MudText>
                 </div>
 
-                @* File Upload Area *@
-                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                               FilesChanged="OnFilesChanged"
-                               MaximumFileCount="10"
-                               Accept=".txt,.md,.pdf,.docx,.html,.htm,.json,.xml,.csv"
-                               Class="mb-4">
-                    <ActivatorContent>
-                        <MudPaper Outlined="true" 
-                                  Class="pa-8 d-flex flex-column align-center justify-center cursor-pointer border-dashed"
-                                  Style="border-width: 2px; min-height: 120px;">
-                            @if (_uploading)
-                            {
-                                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
-                                <MudText Typo="Typo.body2" Class="mt-2">Caricamento in corso...</MudText>
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
-                                <MudText Typo="Typo.body1" Class="mt-2">
-                                    Trascina i file qui o clicca per selezionare
-                                </MudText>
-                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                                    Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
-                                </MudText>
-                            }
-                        </MudPaper>
-                    </ActivatorContent>
-                </MudFileUpload>
+                @* File Upload Area with Drag-and-Drop Support *@
+                <MudPaper @ondragenter="@SetDragClass"
+                          @ondragleave="@ClearDragClass"
+                          @ondragend="@ClearDragClass"
+                          Outlined="true"
+                          Class="@GetDropzoneClass()"
+                          Style="border-width: 2px; min-height: 120px; position: relative;">
+                    <InputFile OnChange="OnInputFileChanged"
+                               multiple
+                               accept=".txt,.md,.pdf,.docx,.html,.htm,.json,.xml,.csv"
+                               class="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                               style="opacity: 0; cursor: pointer;" />
+                    @if (_uploading)
+                    {
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                        <MudText Typo="Typo.body2" Class="mt-2">Caricamento in corso...</MudText>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.body1" Class="mt-2">
+                            Trascina i file qui o clicca per selezionare
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
+                        </MudText>
+                    }
+                </MudPaper>
 
                 @* Search and Filter *@
                 <MudTextField @bind-Value="_searchText"
@@ -136,7 +137,7 @@ else
                               Immediate="true"
                               DebounceInterval="300"
                               Variant="Variant.Outlined"
-                              Class="mb-4"
+                              Class="mt-6 mb-4"
                               Clearable="true"
                               OnClearButtonClick="@(() => { _searchText = string.Empty; })" />
 
@@ -219,6 +220,14 @@ else
     private string? _nameError;
     private string _searchText = string.Empty;
     private List<BreadcrumbItem> _breadcrumbs = [];
+    
+    // Drag-and-drop support
+    private string _dragClass = string.Empty;
+    private const string DefaultDragClass = "mud-border-primary";
+
+    private void SetDragClass() => _dragClass = DefaultDragClass;
+    private void ClearDragClass() => _dragClass = string.Empty;
+    private string GetDropzoneClass() => $"pa-8 d-flex flex-column align-center justify-center cursor-pointer border-dashed {_dragClass}";
 
     private IEnumerable<Document> FilteredDocuments => string.IsNullOrWhiteSpace(_searchText)
         ? _documents.OrderByDescending(d => d.CreatedAt)
@@ -334,8 +343,11 @@ else
         }
     }
 
-    private async Task OnFilesChanged(IReadOnlyList<IBrowserFile> files)
+    private async Task OnInputFileChanged(InputFileChangeEventArgs e)
     {
+        ClearDragClass();
+        
+        var files = e.GetMultipleFiles(10); // max 10 files
         if (files.Count == 0 || _project is null) return;
 
         _uploading = true;

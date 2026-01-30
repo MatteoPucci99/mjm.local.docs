@@ -160,8 +160,9 @@ public static class ServiceCollectionExtensions
                 services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
                 
                 // Use raw SQL vector store with separate chunk_embeddings table
+                // Pass SqlServerOptions to support custom schema, table name, and index settings
                 services.AddSingleton<IVectorStore>(sp =>
-                    new SqlServerVectorStore(connectionString, embeddingDimension));
+                    new SqlServerVectorStore(connectionString, embeddingDimension, storageOptions.SqlServer));
                 break;
 
             case StorageProvider.InMemory:

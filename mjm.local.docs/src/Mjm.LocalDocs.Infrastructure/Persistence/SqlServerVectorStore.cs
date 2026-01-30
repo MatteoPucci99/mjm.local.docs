@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using Mjm.LocalDocs.Core.Abstractions;
+using Mjm.LocalDocs.Core.Configuration;
 
 namespace Mjm.LocalDocs.Infrastructure.Persistence;
 
@@ -14,16 +15,52 @@ public sealed class SqlServerVectorStore : IVectorStore
 {
     private readonly string _connectionString;
     private readonly int _dimension;
+    private readonly string _schema;
+    private readonly string _tableName;
+    private readonly bool _useVectorIndex;
     private readonly string _distanceMetric;
 
+    /// <summary>
+    /// Gets the fully qualified table name with schema.
+    /// </summary>
+    private string FullTableName => $"[{_schema}].[{_tableName}]";
+
+    /// <summary>
+    /// Gets the vector index name.
+    /// </summary>
+    private string IndexName => $"vec_idx_{_tableName}";
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="SqlServerVectorStore"/> with explicit parameters.
+    /// </summary>
+    /// <param name="connectionString">SQL Server connection string.</param>
+    /// <param name="dimension">Dimension of embedding vectors (default 1536).</param>
+    /// <param name="distanceMetric">Distance metric: cosine, euclidean, dotproduct (default cosine).</param>
     public SqlServerVectorStore(
         string connectionString,
         int dimension = 1536,
         string distanceMetric = "cosine")
+        : this(connectionString, dimension, new SqlServerOptions { DistanceMetric = distanceMetric })
     {
-        _connectionString = connectionString;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="SqlServerVectorStore"/> with options.
+    /// </summary>
+    /// <param name="connectionString">SQL Server connection string.</param>
+    /// <param name="dimension">Dimension of embedding vectors.</param>
+    /// <param name="options">SQL Server-specific options.</param>
+    public SqlServerVectorStore(
+        string connectionString,
+        int dimension,
+        SqlServerOptions options)
+    {
+        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _dimension = dimension;
-        _distanceMetric = distanceMetric;
+        _schema = options.Schema;
+        _tableName = options.TableName;
+        _useVectorIndex = options.UseVectorIndex;
+        _distanceMetric = options.DistanceMetric;
     }
 
     /// <inheritdoc />
@@ -32,11 +69,25 @@ public sealed class SqlServerVectorStore : IVectorStore
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
 
+        // Create schema if not exists (only if not dbo)
+        if (!string.Equals(_schema, "dbo", StringComparison.OrdinalIgnoreCase))
+        {
+            var createSchemaSql = $"""
+                IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '{_schema}')
+                BEGIN
+                    EXEC('CREATE SCHEMA [{_schema}]');
+                END
+                """;
+
+            await using var createSchemaCmd = new SqlCommand(createSchemaSql, connection);
+            await createSchemaCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         // Create table if not exists
         var createTableSql = $"""
-            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'chunk_embeddings')
+            IF NOT EXISTS (SELECT * FROM sys.tables t JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name = '{_tableName}' AND s.name = '{_schema}')
             BEGIN
-                CREATE TABLE [dbo].[chunk_embeddings] (
+                CREATE TABLE {FullTableName} (
                     chunk_id NVARCHAR(255) PRIMARY KEY,
                     embedding VECTOR({_dimension}) NOT NULL
                 );
@@ -47,24 +98,27 @@ public sealed class SqlServerVectorStore : IVectorStore
         await createTableCmd.ExecuteNonQueryAsync(cancellationToken);
 
         // Create vector index if not exists (for approximate nearest neighbor search)
-        var createIndexSql = $"""
-            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'vec_idx_chunk_embeddings')
-            BEGIN
-                CREATE VECTOR INDEX vec_idx_chunk_embeddings 
-                ON [dbo].[chunk_embeddings](embedding)
-                WITH (metric = '{_distanceMetric}');
-            END
-            """;
+        if (_useVectorIndex)
+        {
+            var createIndexSql = $"""
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{IndexName}')
+                BEGIN
+                    CREATE VECTOR INDEX {IndexName} 
+                    ON {FullTableName}(embedding)
+                    WITH (metric = '{_distanceMetric}');
+                END
+                """;
 
-        try
-        {
-            await using var createIndexCmd = new SqlCommand(createIndexSql, connection);
-            await createIndexCmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (SqlException)
-        {
-            // Vector index creation may fail on some SQL Server versions
-            // The store will still work with exact k-NN search
+            try
+            {
+                await using var createIndexCmd = new SqlCommand(createIndexSql, connection);
+                await createIndexCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+            catch (SqlException)
+            {
+                // Vector index creation may fail on some SQL Server versions
+                // The store will still work with exact k-NN search
+            }
         }
     }
 
@@ -81,7 +135,7 @@ public sealed class SqlServerVectorStore : IVectorStore
 
         // Use MERGE for upsert
         var sql = $"""
-            MERGE INTO chunk_embeddings AS target
+            MERGE INTO {FullTableName} AS target
             USING (SELECT @chunkId AS chunk_id) AS source
             ON target.chunk_id = source.chunk_id
             WHEN MATCHED THEN
@@ -127,7 +181,7 @@ public sealed class SqlServerVectorStore : IVectorStore
 
         // Build a multi-row MERGE statement
         var sb = new StringBuilder();
-        sb.AppendLine("MERGE INTO chunk_embeddings AS target");
+        sb.AppendLine($"MERGE INTO {FullTableName} AS target");
         sb.AppendLine("USING (VALUES");
 
         var parameters = new List<SqlParameter>();
@@ -166,7 +220,7 @@ public sealed class SqlServerVectorStore : IVectorStore
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        const string sql = "DELETE FROM chunk_embeddings WHERE chunk_id = @chunkId";
+        var sql = $"DELETE FROM {FullTableName} WHERE chunk_id = @chunkId";
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@chunkId", chunkId);
@@ -183,7 +237,7 @@ public sealed class SqlServerVectorStore : IVectorStore
         await connection.OpenAsync(cancellationToken);
 
         // Chunk IDs follow pattern: {documentId}_chunk_{index}
-        const string sql = "DELETE FROM chunk_embeddings WHERE chunk_id LIKE @pattern";
+        var sql = $"DELETE FROM {FullTableName} WHERE chunk_id LIKE @pattern";
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@pattern", $"{documentId}_chunk_%");
@@ -207,7 +261,7 @@ public sealed class SqlServerVectorStore : IVectorStore
             SELECT TOP (@limit) 
                 chunk_id,
                 VECTOR_DISTANCE('{_distanceMetric}', embedding, CAST(@queryEmbedding AS VECTOR({_dimension}))) AS distance
-            FROM chunk_embeddings
+            FROM {FullTableName}
             ORDER BY distance ASC
             """;
 
