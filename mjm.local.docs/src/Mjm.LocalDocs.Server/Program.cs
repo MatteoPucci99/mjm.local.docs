@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Mjm.LocalDocs.Core.Abstractions;
@@ -63,6 +64,10 @@ builder.Services.Configure<LocalDocsAuthOptions>(
 builder.Services.Configure<McpOptions>(
     builder.Configuration.GetSection(McpOptions.SectionName));
 
+// Bind Server options from configuration
+builder.Services.Configure<ServerOptions>(
+    builder.Configuration.GetSection(ServerOptions.SectionName));
+
 // Add Infrastructure services - configured from appsettings.json
 // See LocalDocs:Embeddings section for provider configuration (Fake, OpenAI)
 // See LocalDocs:Storage section for storage configuration (InMemory, Sqlite)
@@ -92,19 +97,38 @@ using (var scope = app.Services.CreateScope())
     await vectorStore.InitializeAsync();
 }
 
+// Get server options for HTTPS configuration
+var serverOptions = app.Services.GetRequiredService<IOptions<ServerOptions>>().Value;
+
 // Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
+    
+    // Only enable HSTS when HTTPS is configured
+    if (serverOptions.UseHttps)
+    {
+        app.UseHsts();
+    }
 }
+
+// Support for running behind a reverse proxy (IIS, nginx, Azure App Service)
+// This ensures the app correctly identifies HTTPS requests forwarded from the proxy
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
-// HTTPS redirect only for non-MCP requests (MCP tools connect via HTTP)
-app.UseWhen(
-    context => !context.Request.Path.StartsWithSegments("/mcp"),
-    appBuilder => appBuilder.UseHttpsRedirection());
+// HTTPS redirect only when UseHttps is enabled, and only for non-MCP requests
+// MCP tools may connect via HTTP even when HTTPS is enabled for the web UI
+if (serverOptions.UseHttps)
+{
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/mcp"),
+        appBuilder => appBuilder.UseHttpsRedirection());
+}
 
 app.UseAntiforgery();
 
