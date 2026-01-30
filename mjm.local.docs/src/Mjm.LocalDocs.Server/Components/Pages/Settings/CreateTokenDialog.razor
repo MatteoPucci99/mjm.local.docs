@@ -1,0 +1,77 @@
+@using System.ComponentModel.DataAnnotations
+@using static Mjm.LocalDocs.Server.Components.Pages.Settings.ApiTokens
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@_model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            
+            <MudTextField @bind-Value="_model.Name"
+                          Label="Nome"
+                          Placeholder="es. Claude Code, Produzione, Test..."
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          For="@(() => _model.Name)"
+                          Class="mb-4"
+                          HelperText="Un nome identificativo per questo token" />
+
+            <MudCheckBox @bind-Value="_hasExpiration" 
+                         Label="Imposta data di scadenza" 
+                         Color="Color.Primary"
+                         Class="mb-4" />
+
+            @if (_hasExpiration)
+            {
+                <MudDatePicker @bind-Date="_expirationDate"
+                               Label="Data di scadenza"
+                               Variant="Variant.Outlined"
+                               MinDate="@DateTime.Today.AddDays(1)"
+                               Class="mb-4"
+                               HelperText="Il token non sara piu valido dopo questa data" />
+            }
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Annulla</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   Disabled="@string.IsNullOrWhiteSpace(_model.Name)">
+            Crea Token
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private readonly TokenFormModel _model = new();
+    private bool _hasExpiration;
+    private DateTime? _expirationDate;
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Name))
+            return;
+
+        DateTimeOffset? expiresAt = null;
+        if (_hasExpiration && _expirationDate.HasValue)
+        {
+            // Set expiration to end of day in UTC
+            expiresAt = new DateTimeOffset(_expirationDate.Value.Date.AddDays(1).AddSeconds(-1), TimeSpan.Zero);
+        }
+
+        var result = new CreateTokenResult(_model.Name.Trim(), expiresAt);
+        MudDialog?.Close(DialogResult.Ok(result));
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private sealed class TokenFormModel
+    {
+        [Required(ErrorMessage = "Il nome e obbligatorio")]
+        [StringLength(200, ErrorMessage = "Il nome non puo superare i 200 caratteri")]
+        public string Name { get; set; } = string.Empty;
+    }
+}

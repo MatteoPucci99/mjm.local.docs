@@ -40,6 +40,9 @@ public static class ServiceCollectionExtensions
                 fileStorage,
                 fileStorageProvider);
         });
+
+        // API Token service for MCP authentication
+        services.AddScoped<ApiTokenService>();
         
         return services;
     }

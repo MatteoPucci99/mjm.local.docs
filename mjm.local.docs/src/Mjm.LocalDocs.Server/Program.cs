@@ -5,11 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Mjm.LocalDocs.Core.Abstractions;
 using Mjm.LocalDocs.Core.DependencyInjection;
+using Mjm.LocalDocs.Core.Models;
 using LocalDocsAuthOptions = Mjm.LocalDocs.Core.Models.AuthenticationOptions;
 using Mjm.LocalDocs.Infrastructure.DependencyInjection;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 using Mjm.LocalDocs.Server.Components;
 using Mjm.LocalDocs.Server.McpTools;
+using Mjm.LocalDocs.Server.Middleware;
 using ModelContextProtocol.AspNetCore;
 using MudBlazor.Services;
 
@@ -56,6 +58,10 @@ builder.Services.AddLocalDocsCoreServices();
 // Bind authentication options from configuration
 builder.Services.Configure<LocalDocsAuthOptions>(
     builder.Configuration.GetSection(LocalDocsAuthOptions.SectionName));
+
+// Bind MCP options from configuration
+builder.Services.Configure<McpOptions>(
+    builder.Configuration.GetSection(McpOptions.SectionName));
 
 // Add Infrastructure services - configured from appsettings.json
 // See LocalDocs:Embeddings section for provider configuration (Fake, OpenAI)
@@ -104,6 +110,9 @@ app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// MCP Authentication middleware (Bearer token validation)
+app.UseMcpAuthentication("/mcp");
 
 // Login endpoint (POST) - browser form submission
 app.MapPost("/api/login", async (

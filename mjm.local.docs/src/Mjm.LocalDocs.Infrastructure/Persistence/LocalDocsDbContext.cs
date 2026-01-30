@@ -17,6 +17,7 @@ public sealed class LocalDocsDbContext : DbContext
     public DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     public DbSet<DocumentEntity> Documents => Set<DocumentEntity>();
     public DbSet<DocumentChunkEntity> DocumentChunks => Set<DocumentChunkEntity>();
+    public DbSet<ApiTokenEntity> ApiTokens => Set<ApiTokenEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +26,7 @@ public sealed class LocalDocsDbContext : DbContext
         ConfigureProject(modelBuilder);
         ConfigureDocument(modelBuilder);
         ConfigureDocumentChunk(modelBuilder);
+        ConfigureApiToken(modelBuilder);
     }
 
     private static void ConfigureProject(ModelBuilder modelBuilder)
@@ -145,6 +147,44 @@ public sealed class LocalDocsDbContext : DbContext
 
             entity.HasIndex(e => e.DocumentId);
             entity.HasIndex(e => new { e.DocumentId, e.ChunkIndex });
+        });
+    }
+
+    private static void ConfigureApiToken(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ApiTokenEntity>(entity =>
+        {
+            entity.ToTable("ApiTokens");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.TokenHash)
+                .HasMaxLength(64) // Base64-encoded SHA256
+                .IsRequired();
+
+            entity.Property(e => e.TokenPrefix)
+                .HasMaxLength(10);
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+
+            entity.Property(e => e.IsRevoked)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            // Index on TokenHash for fast lookups during authentication
+            entity.HasIndex(e => e.TokenHash)
+                .IsUnique();
+
+            // Index on Name for uniqueness check
+            entity.HasIndex(e => e.Name);
         });
     }
 }

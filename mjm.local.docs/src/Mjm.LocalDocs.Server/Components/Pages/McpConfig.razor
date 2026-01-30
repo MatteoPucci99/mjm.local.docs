@@ -1,8 +1,12 @@
 @page "/mcp-config"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Mjm.LocalDocs.Core.Models
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject IOptions<McpOptions> McpOptions
+@inject NavigationManager Navigation
 
 <PageTitle>MCP Configuration - Local Docs</PageTitle>
 
@@ -16,6 +20,16 @@
         Make sure the Local Docs server is running at <code>@ServerUrl</code> before configuring your client.
     </MudText>
 </MudAlert>
+
+@if (McpOptions.Value.RequireAuthentication)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        <MudText Typo="Typo.body2">
+            <strong>Autenticazione Richiesta:</strong> Il server MCP richiede un token Bearer per l'autenticazione.
+            <MudLink Href="/settings/tokens" Typo="Typo.body2">Crea un API Token</MudLink> e aggiungilo alla configurazione.
+        </MudText>
+    </MudAlert>
+}
 
 <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
     <MudTabPanel Text="Claude Code" Icon="@Icons.Material.Filled.Terminal">
@@ -183,9 +197,23 @@
 @code {
     private const string ServerUrl = "http://localhost:5024/mcp";
     
-    private const string ClaudeCliCommand = "claude mcp add local-docs --transport http http://localhost:5024/mcp";
+    private string ClaudeCliCommand => McpOptions.Value.RequireAuthentication
+        ? "claude mcp add local-docs --transport http --header \"Authorization: Bearer YOUR_TOKEN_HERE\" http://localhost:5024/mcp"
+        : "claude mcp add local-docs --transport http http://localhost:5024/mcp";
     
-    private const string ClaudeJsonConfig = @"{
+    private string ClaudeJsonConfig => McpOptions.Value.RequireAuthentication
+        ? @"{
+  ""mcpServers"": {
+    ""local-docs"": {
+      ""type"": ""http"",
+      ""url"": ""http://localhost:5024/mcp"",
+      ""headers"": {
+        ""Authorization"": ""Bearer YOUR_TOKEN_HERE""
+      }
+    }
+  }
+}"
+        : @"{
   ""mcpServers"": {
     ""local-docs"": {
       ""type"": ""http"",
@@ -194,7 +222,21 @@
   }
 }";
 
-    private const string OpenCodeJsonConfig = @"{
+    private string OpenCodeJsonConfig => McpOptions.Value.RequireAuthentication
+        ? @"{
+  ""$schema"": ""https://opencode.ai/config.json"",
+  ""mcp"": {
+    ""local-docs"": {
+      ""type"": ""remote"",
+      ""url"": ""http://localhost:5024/mcp"",
+      ""headers"": {
+        ""Authorization"": ""Bearer YOUR_TOKEN_HERE""
+      },
+      ""enabled"": true
+    }
+  }
+}"
+        : @"{
   ""$schema"": ""https://opencode.ai/config.json"",
   ""mcp"": {
     ""local-docs"": {

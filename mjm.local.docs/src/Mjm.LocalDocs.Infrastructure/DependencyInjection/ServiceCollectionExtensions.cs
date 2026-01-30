@@ -106,6 +106,7 @@ public static class ServiceCollectionExtensions
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
+                services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
                 services.AddSingleton<IVectorStore>(sp =>
                     new SqliteVectorStore(connectionString, embeddingDimension));
                 break;
@@ -126,6 +127,7 @@ public static class ServiceCollectionExtensions
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
+                services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
 
                 // Use HNSW for vector search instead of brute-force SQLite
                 services.AddSingleton<IVectorStore>(sp =>
@@ -155,6 +157,7 @@ public static class ServiceCollectionExtensions
 
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
+                services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
                 
                 // Use raw SQL vector store with separate chunk_embeddings table
                 services.AddSingleton<IVectorStore>(sp =>
@@ -165,6 +168,7 @@ public static class ServiceCollectionExtensions
             default:
                 services.AddSingleton<IProjectRepository, InMemoryProjectRepository>();
                 services.AddSingleton<IDocumentRepository, InMemoryDocumentRepository>();
+                services.AddSingleton<IApiTokenRepository, InMemoryApiTokenRepository>();
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 break;
         }
