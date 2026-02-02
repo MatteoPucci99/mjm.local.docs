@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mjm.LocalDocs.Core\Mjm.LocalDocs.Core.csproj" />
+    <ProjectReference Include="..\Mjm.LocalDocs.Infrastructure\Mjm.LocalDocs.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.6.0-preview.1" />
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>8ef649af-010c-4434-8adc-98da93e2e355</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

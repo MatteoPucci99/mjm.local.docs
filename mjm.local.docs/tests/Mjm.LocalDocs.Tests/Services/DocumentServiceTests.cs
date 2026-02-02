@@ -1,0 +1,434 @@
+using Mjm.LocalDocs.Core.Abstractions;
+using Mjm.LocalDocs.Core.Models;
+using Mjm.LocalDocs.Core.Services;
+using NSubstitute;
+
+namespace Mjm.LocalDocs.Tests.Services;
+
+/// <summary>
+/// Unit tests for <see cref="DocumentService"/>.
+/// </summary>
+public sealed class DocumentServiceTests
+{
+    private readonly IDocumentRepository _repository;
+    private readonly IVectorStore _vectorStore;
+    private readonly IDocumentProcessor _processor;
+    private readonly IEmbeddingService _embeddingService;
+    private readonly DocumentService _sut;
+
+    public DocumentServiceTests()
+    {
+        _repository = Substitute.For<IDocumentRepository>();
+        _vectorStore = Substitute.For<IVectorStore>();
+        _processor = Substitute.For<IDocumentProcessor>();
+        _embeddingService = Substitute.For<IEmbeddingService>();
+
+        _sut = new DocumentService(
+            _repository,
+            _vectorStore,
+            _processor,
+            _embeddingService);
+    }
+
+    #region Helper Methods
+
+    private static Document CreateTestDocument(string id = "doc-1", string projectId = "proj-1")
+    {
+        return new Document
+        {
+            Id = id,
+            ProjectId = projectId,
+            FileName = "test-document.txt",
+            FileExtension = ".txt",
+            FileContent = "Test content"u8.ToArray(),
+            FileSizeBytes = 12,
+            ExtractedText = "Test content for chunking"
+        };
+    }
+
+    private static DocumentChunk CreateTestChunk(string id, string documentId, int chunkIndex = 0)
+    {
+        return new DocumentChunk
+        {
+            Id = id,
+            DocumentId = documentId,
+            Content = $"Chunk content {chunkIndex}",
+            ChunkIndex = chunkIndex,
+            FileName = "test-document.txt"
+        };
+    }
+
+    private static ReadOnlyMemory<float> CreateTestEmbedding()
+    {
+        return new float[] { 0.1f, 0.2f, 0.3f };
+    }
+
+    #endregion
+
+    #region AddDocumentAsync Tests
+
+    [Fact]
+    public async Task AddDocumentAsync_WithChunks_StoresDocumentChunksAndEmbeddings()
+    {
+        // Arrange
+        var document = CreateTestDocument();
+        var chunks = new List<DocumentChunk>
+        {
+            CreateTestChunk("doc-1_chunk_0", "doc-1", 0),
+            CreateTestChunk("doc-1_chunk_1", "doc-1", 1)
+        };
+        var embeddings = new List<ReadOnlyMemory<float>>
+        {
+            CreateTestEmbedding(),
+            CreateTestEmbedding()
+        };
+
+        _repository.AddDocumentAsync(document, Arg.Any<CancellationToken>())
+            .Returns(document);
+        _processor.ChunkDocumentAsync(document, Arg.Any<CancellationToken>())
+            .Returns(chunks);
+        _embeddingService.GenerateEmbeddingsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(embeddings);
+
+        // Act
+        var result = await _sut.AddDocumentAsync(document);
+
+        // Assert
+        Assert.Equal(document.Id, result.Id);
+
+        await _repository.Received(1).AddDocumentAsync(document, Arg.Any<CancellationToken>());
+        await _processor.Received(1).ChunkDocumentAsync(document, Arg.Any<CancellationToken>());
+        await _repository.Received(1).AddChunksAsync(chunks, Arg.Any<CancellationToken>());
+        await _embeddingService.Received(1).GenerateEmbeddingsAsync(
+            Arg.Is<IEnumerable<string>>(texts => texts.Count() == 2),
+            Arg.Any<CancellationToken>());
+        await _vectorStore.Received(1).UpsertBatchAsync(
+            Arg.Is<IEnumerable<KeyValuePair<string, ReadOnlyMemory<float>>>>(e => e.Count() == 2),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AddDocumentAsync_WithNoChunks_StoresOnlyDocument()
+    {
+        // Arrange
+        var document = CreateTestDocument();
+        var emptyChunks = new List<DocumentChunk>();
+
+        _repository.AddDocumentAsync(document, Arg.Any<CancellationToken>())
+            .Returns(document);
+        _processor.ChunkDocumentAsync(document, Arg.Any<CancellationToken>())
+            .Returns(emptyChunks);
+
+        // Act
+        var result = await _sut.AddDocumentAsync(document);
+
+        // Assert
+        Assert.Equal(document.Id, result.Id);
+
+        await _repository.Received(1).AddDocumentAsync(document, Arg.Any<CancellationToken>());
+        await _processor.Received(1).ChunkDocumentAsync(document, Arg.Any<CancellationToken>());
+        await _repository.DidNotReceive().AddChunksAsync(Arg.Any<IEnumerable<DocumentChunk>>(), Arg.Any<CancellationToken>());
+        await _embeddingService.DidNotReceive().GenerateEmbeddingsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+        await _vectorStore.DidNotReceive().UpsertBatchAsync(Arg.Any<IEnumerable<KeyValuePair<string, ReadOnlyMemory<float>>>>(), Arg.Any<CancellationToken>());
+    }
+
+    #endregion
+
+    #region SearchAsync Tests
+
+    [Fact]
+    public async Task SearchAsync_WithResults_ReturnsOrderedSearchResults()
+    {
+        // Arrange
+        var query = "test query";
+        var queryEmbedding = CreateTestEmbedding();
+        var vectorResults = new List<VectorSearchResult>
+        {
+            new() { ChunkId = "chunk-1", Score = 0.95 },
+            new() { ChunkId = "chunk-2", Score = 0.85 }
+        };
+        var chunks = new List<DocumentChunk>
+        {
+            CreateTestChunk("chunk-1", "doc-1", 0),
+            CreateTestChunk("chunk-2", "doc-1", 1)
+        };
+
+        _embeddingService.GenerateEmbeddingAsync(query, Arg.Any<CancellationToken>())
+            .Returns(queryEmbedding);
+        _vectorStore.SearchAsync(queryEmbedding, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(vectorResults);
+        _repository.GetChunksByIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(chunks);
+
+        // Act
+        var results = await _sut.SearchAsync(query, limit: 10);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.Equal("chunk-1", results[0].Chunk.Id);
+        Assert.Equal(0.95, results[0].Score);
+        Assert.Equal("chunk-2", results[1].Chunk.Id);
+        Assert.Equal(0.85, results[1].Score);
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithNoVectorResults_ReturnsEmptyList()
+    {
+        // Arrange
+        var query = "test query";
+        var queryEmbedding = CreateTestEmbedding();
+        var emptyVectorResults = new List<VectorSearchResult>();
+
+        _embeddingService.GenerateEmbeddingAsync(query, Arg.Any<CancellationToken>())
+            .Returns(queryEmbedding);
+        _vectorStore.SearchAsync(queryEmbedding, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(emptyVectorResults);
+
+        // Act
+        var results = await _sut.SearchAsync(query);
+
+        // Assert
+        Assert.Empty(results);
+        await _repository.DidNotReceive().GetChunksByIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithProjectFilter_FiltersResultsByProject()
+    {
+        // Arrange
+        var query = "test query";
+        var projectId = "proj-1";
+        var queryEmbedding = CreateTestEmbedding();
+        var vectorResults = new List<VectorSearchResult>
+        {
+            new() { ChunkId = "chunk-1", Score = 0.95 },
+            new() { ChunkId = "chunk-2", Score = 0.85 },
+            new() { ChunkId = "chunk-3", Score = 0.75 }
+        };
+        var chunks = new List<DocumentChunk>
+        {
+            CreateTestChunk("chunk-1", "doc-1", 0),
+            CreateTestChunk("chunk-2", "doc-2", 0),
+            CreateTestChunk("chunk-3", "doc-1", 1)
+        };
+        var documentsInProject = new List<Document>
+        {
+            CreateTestDocument("doc-1", projectId)
+        };
+
+        _embeddingService.GenerateEmbeddingAsync(query, Arg.Any<CancellationToken>())
+            .Returns(queryEmbedding);
+        _vectorStore.SearchAsync(queryEmbedding, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(vectorResults);
+        _repository.GetChunksByIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(chunks);
+        _repository.GetDocumentsByProjectAsync(projectId, Arg.Any<CancellationToken>())
+            .Returns(documentsInProject);
+
+        // Act
+        var results = await _sut.SearchAsync(query, projectId: projectId, limit: 10);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.Equal("doc-1", r.Chunk.DocumentId));
+    }
+
+    #endregion
+
+    #region DeleteDocumentAsync Tests
+
+    [Fact]
+    public async Task DeleteDocumentAsync_WhenDocumentExists_DeletesEmbeddingsAndDocument()
+    {
+        // Arrange
+        var documentId = "doc-1";
+        _repository.DeleteDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        // Act
+        var result = await _sut.DeleteDocumentAsync(documentId);
+
+        // Assert
+        Assert.True(result);
+        await _vectorStore.Received(1).DeleteByDocumentIdAsync(documentId, Arg.Any<CancellationToken>());
+        await _repository.Received(1).DeleteDocumentAsync(documentId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteDocumentAsync_WhenDocumentNotFound_ReturnsFalse()
+    {
+        // Arrange
+        var documentId = "non-existent-doc";
+        _repository.DeleteDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        // Act
+        var result = await _sut.DeleteDocumentAsync(documentId);
+
+        // Assert
+        Assert.False(result);
+        await _vectorStore.Received(1).DeleteByDocumentIdAsync(documentId, Arg.Any<CancellationToken>());
+        await _repository.Received(1).DeleteDocumentAsync(documentId, Arg.Any<CancellationToken>());
+    }
+
+    #endregion
+
+    #region GetDocumentAsync Tests
+
+    [Fact]
+    public async Task GetDocumentAsync_WhenExists_ReturnsDocument()
+    {
+        // Arrange
+        var documentId = "doc-1";
+        var document = CreateTestDocument(documentId);
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(document);
+
+        // Act
+        var result = await _sut.GetDocumentAsync(documentId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(documentId, result.Id);
+    }
+
+    [Fact]
+    public async Task GetDocumentAsync_WhenNotFound_ReturnsNull()
+    {
+        // Arrange
+        var documentId = "non-existent-doc";
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns((Document?)null);
+
+        // Act
+        var result = await _sut.GetDocumentAsync(documentId);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    #endregion
+
+    #region GetDocumentFileAsync Tests
+
+    [Fact]
+    public async Task GetDocumentFileAsync_WhenDocumentHasInlineContent_ReturnsFileContent()
+    {
+        // Arrange
+        var documentId = "doc-1";
+        var fileContent = "Test file content"u8.ToArray();
+        var document = new Document
+        {
+            Id = documentId,
+            ProjectId = "proj-1",
+            FileName = "test.txt",
+            FileExtension = ".txt",
+            FileContent = fileContent, // Inline content (legacy/database storage)
+            FileSizeBytes = fileContent.Length,
+            ExtractedText = "Test"
+        };
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(document);
+
+        // Act
+        var result = await _sut.GetDocumentFileAsync(documentId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileContent, result);
+    }
+
+    [Fact]
+    public async Task GetDocumentFileAsync_WhenNotFound_ReturnsNull()
+    {
+        // Arrange
+        var documentId = "non-existent-doc";
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns((Document?)null);
+
+        // Act
+        var result = await _sut.GetDocumentFileAsync(documentId);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetDocumentFileAsync_WhenNoInlineContent_FallsBackToRepository()
+    {
+        // Arrange
+        var documentId = "doc-1";
+        var fileContent = "Test file content"u8.ToArray();
+        var document = new Document
+        {
+            Id = documentId,
+            ProjectId = "proj-1",
+            FileName = "test.txt",
+            FileExtension = ".txt",
+            FileContent = null, // No inline content
+            FileStorageLocation = null, // No external storage location
+            FileSizeBytes = fileContent.Length,
+            ExtractedText = "Test"
+        };
+        _repository.GetDocumentAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(document);
+        _repository.GetDocumentFileAsync(documentId, Arg.Any<CancellationToken>())
+            .Returns(fileContent);
+
+        // Act
+        var result = await _sut.GetDocumentFileAsync(documentId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(fileContent, result);
+    }
+
+    #endregion
+
+    #region GetDocumentsByProjectAsync Tests
+
+    [Fact]
+    public async Task GetDocumentsByProjectAsync_ReturnsDocumentsFromRepository()
+    {
+        // Arrange
+        var projectId = "proj-1";
+        var documents = new List<Document>
+        {
+            CreateTestDocument("doc-1", projectId),
+            CreateTestDocument("doc-2", projectId)
+        };
+        _repository.GetDocumentsByProjectAsync(projectId, Arg.Any<CancellationToken>())
+            .Returns(documents);
+
+        // Act
+        var result = await _sut.GetDocumentsByProjectAsync(projectId);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.All(result, d => Assert.Equal(projectId, d.ProjectId));
+    }
+
+    #endregion
+
+    #region GetProjectsWithDocumentsAsync Tests
+
+    [Fact]
+    public async Task GetProjectsWithDocumentsAsync_ReturnsProjectsFromRepository()
+    {
+        // Arrange
+        var projects = new List<string> { "proj-1", "proj-2", "proj-3" };
+        _repository.GetProjectsWithDocumentsAsync(Arg.Any<CancellationToken>())
+            .Returns(projects);
+
+        // Act
+        var result = await _sut.GetProjectsWithDocumentsAsync();
+
+        // Assert
+        Assert.Equal(3, result.Count);
+        Assert.Contains("proj-1", result);
+        Assert.Contains("proj-2", result);
+        Assert.Contains("proj-3", result);
+    }
+
+    #endregion
+}
