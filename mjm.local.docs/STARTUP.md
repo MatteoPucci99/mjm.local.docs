@@ -89,7 +89,11 @@ What's your use case?
 │
 ├─► Development/Testing ────────────────► Fake (free, no API)
 │
-└─► Production (real semantic search) ──► OpenAI
+├─► Local/Private (no cloud) ───────────► Ollama (free, local)
+│
+├─► Production (OpenAI account) ────────► OpenAI
+│
+└─► Enterprise (Azure) ─────────────────► AzureOpenAI
 ```
 
 ### Step 3: Choose File Storage
@@ -109,9 +113,10 @@ Where should document files be stored?
 | Scenario | Storage | Embeddings | FileStorage |
 |----------|---------|------------|-------------|
 | Local development | `Sqlite` | `Fake` | `Database` |
+| Local/Private (no cloud) | `Sqlite` | `Ollama` | `FileSystem` |
 | Small team (< 10K docs) | `Sqlite` | `OpenAI` | `FileSystem` |
 | Medium deployment | `SqliteHnsw` | `OpenAI` | `FileSystem` |
-| Enterprise / Azure | `SqlServer` | `OpenAI` | `AzureBlob` |
+| Enterprise / Azure | `SqlServer` | `AzureOpenAI` | `AzureBlob` |
 
 ---
 
@@ -331,7 +336,9 @@ Choose an embedding provider based on your use case.
 | Provider | API Calls | Cost | Best For |
 |----------|-----------|------|----------|
 | `Fake` | None | Free | Development, testing |
-| `OpenAI` | Yes | Pay-per-use | Production |
+| `OpenAI` | Yes | Pay-per-use | Production (OpenAI account) |
+| `AzureOpenAI` | Yes | Pay-per-use | Enterprise (Azure subscription) |
+| `Ollama` | None (local) | Free | Local/private deployments |
 
 #### Fake Embeddings (Development)
 
@@ -413,6 +420,140 @@ Then omit the `ApiKey` from config:
       "Dimension": 1536,
       "OpenAI": {
         "Model": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+---
+
+#### Azure OpenAI Embeddings (Enterprise)
+
+Uses Azure OpenAI Service for embeddings. Ideal for enterprise deployments with Azure compliance requirements.
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "AzureOpenAI",
+      "Dimension": 1536,
+      "AzureOpenAI": {
+        "Endpoint": "https://your-resource.openai.azure.com/",
+        "ApiKey": "your-azure-openai-key",
+        "DeploymentName": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+**Azure OpenAI Options:**
+
+| Setting | Default | Required | Description |
+|---------|---------|----------|-------------|
+| `Endpoint` | - | Yes* | Azure OpenAI endpoint URL (or use `AZURE_OPENAI_ENDPOINT` env var) |
+| `ApiKey` | - | Yes* | Azure OpenAI API key (or use `AZURE_OPENAI_API_KEY` env var) |
+| `DeploymentName` | `text-embedding-3-small` | No | Your Azure OpenAI embedding deployment name |
+
+*Required when `Provider` is `AzureOpenAI`.
+
+**Using Environment Variables:**
+
+```bash
+# Linux/macOS
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+export AZURE_OPENAI_API_KEY=your-azure-openai-key
+
+# Windows (PowerShell)
+$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+$env:AZURE_OPENAI_API_KEY = "your-azure-openai-key"
+```
+
+Then omit credentials from config:
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "AzureOpenAI",
+      "Dimension": 1536,
+      "AzureOpenAI": {
+        "DeploymentName": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+**Azure Portal Setup:**
+
+1. Create an Azure OpenAI resource in Azure Portal
+2. Deploy an embedding model (e.g., `text-embedding-3-small`)
+3. Copy the endpoint URL and API key from "Keys and Endpoint"
+4. Use the deployment name you chose during model deployment
+
+---
+
+#### Ollama Embeddings (Local/Private)
+
+Uses Ollama for local embeddings without any cloud API calls. Perfect for privacy-sensitive deployments or offline use.
+
+**Prerequisites:**
+
+1. Install Ollama from https://ollama.com
+2. Pull an embedding model:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+3. Ensure Ollama is running: `ollama serve`
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "Ollama",
+      "Dimension": 768,
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "Model": "nomic-embed-text"
+      }
+    }
+  }
+}
+```
+
+**Ollama Options:**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `Endpoint` | `http://localhost:11434` | Ollama server URL |
+| `Model` | `nomic-embed-text` | Embedding model name |
+
+**Popular Ollama Embedding Models:**
+
+| Model | Dimension | Pull Command | Notes |
+|-------|-----------|--------------|-------|
+| `nomic-embed-text` | 768 | `ollama pull nomic-embed-text` | Recommended - good balance of quality and speed |
+| `mxbai-embed-large` | 1024 | `ollama pull mxbai-embed-large` | Higher quality, slower |
+| `all-minilm` | 384 | `ollama pull all-minilm` | Fastest, lower quality |
+| `snowflake-arctic-embed` | 1024 | `ollama pull snowflake-arctic-embed` | High quality, multilingual |
+
+> **Important:** The `Dimension` setting must match your model's output dimension!
+
+**Remote Ollama Server:**
+
+If running Ollama on a different machine:
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "Ollama",
+      "Dimension": 768,
+      "Ollama": {
+        "Endpoint": "http://ollama-server:11434",
+        "Model": "nomic-embed-text"
       }
     }
   }
@@ -766,7 +907,7 @@ Medium-scale production with fast vector search.
 
 ---
 
-### Enterprise (SQL Server + Azure Blob)
+### Enterprise (Azure OpenAI + SQL Server + Azure Blob)
 
 Full enterprise setup with Azure services.
 
@@ -793,10 +934,10 @@ Full enterprise setup with Azure services.
       "RequireAuthentication": true
     },
     "Embeddings": {
-      "Provider": "OpenAI",
+      "Provider": "AzureOpenAI",
       "Dimension": 1536,
-      "OpenAI": {
-        "Model": "text-embedding-3-small"
+      "AzureOpenAI": {
+        "DeploymentName": "text-embedding-3-small"
       }
     },
     "Storage": {
@@ -824,8 +965,70 @@ Full enterprise setup with Azure services.
 ```
 
 > **Note:** Set environment variables:
-> - `OPENAI_API_KEY`
+> - `AZURE_OPENAI_ENDPOINT`
+> - `AZURE_OPENAI_API_KEY`
 > - `AZURE_STORAGE_CONNECTION_STRING`
+
+---
+
+### Local/Private (Ollama + SQLite)
+
+Privacy-focused setup with no cloud dependencies.
+
+**Prerequisites:**
+1. Install Ollama: https://ollama.com
+2. Pull embedding model: `ollama pull nomic-embed-text`
+3. Start Ollama: `ollama serve`
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "LocalDocs": "Data Source=/data/localdocs.db"
+  },
+  "LocalDocs": {
+    "Server": {
+      "UseHttps": false
+    },
+    "Authentication": {
+      "Username": "admin",
+      "Password": "CHANGE_THIS_PASSWORD"
+    },
+    "Mcp": {
+      "RequireAuthentication": true
+    },
+    "Embeddings": {
+      "Provider": "Ollama",
+      "Dimension": 768,
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "Model": "nomic-embed-text"
+      }
+    },
+    "Storage": {
+      "Provider": "Sqlite"
+    },
+    "FileStorage": {
+      "Provider": "FileSystem",
+      "FileSystem": {
+        "BasePath": "/data/documents",
+        "CreateDirectoryIfNotExists": true
+      }
+    },
+    "Chunking": {
+      "MaxChunkSize": 3000,
+      "OverlapSize": 300
+    }
+  }
+}
+```
+
+> **Note:** No API keys required! All processing happens locally.
 
 ---
 
@@ -878,6 +1081,8 @@ This creates separate tables `[team_a].[chunk_embeddings]` and `[team_b].[chunk_
 | Variable | Config Path | Description |
 |----------|-------------|-------------|
 | `OPENAI_API_KEY` | `LocalDocs:Embeddings:OpenAI:ApiKey` | OpenAI API key for embeddings |
+| `AZURE_OPENAI_ENDPOINT` | `LocalDocs:Embeddings:AzureOpenAI:Endpoint` | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_API_KEY` | `LocalDocs:Embeddings:AzureOpenAI:ApiKey` | Azure OpenAI API key |
 | `AZURE_STORAGE_CONNECTION_STRING` | `LocalDocs:FileStorage:AzureBlob:ConnectionString` | Azure Blob Storage connection string |
 
 **ASP.NET Core Configuration Override:**
@@ -955,6 +1160,41 @@ Either set the API key in config or via environment variable:
 ```bash
 export OPENAI_API_KEY=sk-...
 ```
+
+#### "Azure OpenAI endpoint/key not configured"
+
+Set both environment variables:
+
+```bash
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+export AZURE_OPENAI_API_KEY=your-key
+```
+
+Or configure in appsettings.json under `LocalDocs:Embeddings:AzureOpenAI`.
+
+#### "Ollama connection refused"
+
+1. Ensure Ollama is running: `ollama serve`
+2. Check if the endpoint is correct (default: `http://localhost:11434`)
+3. Verify the model is pulled: `ollama list`
+4. If using a remote server, check firewall rules
+
+#### "Ollama model not found"
+
+Pull the embedding model first:
+
+```bash
+ollama pull nomic-embed-text
+```
+
+#### "Embedding dimension mismatch"
+
+Ensure the `Dimension` setting matches your model's output:
+- OpenAI `text-embedding-3-small`: 1536
+- Azure OpenAI `text-embedding-3-small`: 1536
+- Ollama `nomic-embed-text`: 768
+- Ollama `mxbai-embed-large`: 1024
+- Ollama `all-minilm`: 384
 
 #### "Unable to create SQLite database"
 
