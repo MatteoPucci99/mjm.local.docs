@@ -195,57 +195,57 @@
 </style>
 
 @code {
-    private const string ServerUrl = "http://localhost:5024/mcp";
+    private string ServerUrl => $"{Navigation.BaseUri.TrimEnd('/')}/mcp";
     
     private string ClaudeCliCommand => McpOptions.Value.RequireAuthentication
-        ? "claude mcp add local-docs --transport http --header \"Authorization: Bearer YOUR_TOKEN_HERE\" http://localhost:5024/mcp"
-        : "claude mcp add local-docs --transport http http://localhost:5024/mcp";
+        ? $"claude mcp add local-docs --transport http --header \"Authorization: Bearer YOUR_TOKEN_HERE\" {ServerUrl}"
+        : $"claude mcp add local-docs --transport http {ServerUrl}";
     
     private string ClaudeJsonConfig => McpOptions.Value.RequireAuthentication
-        ? @"{
-  ""mcpServers"": {
-    ""local-docs"": {
+        ? $@"{{
+  ""mcpServers"": {{
+    ""local-docs"": {{
       ""type"": ""http"",
-      ""url"": ""http://localhost:5024/mcp"",
-      ""headers"": {
+      ""url"": ""{ServerUrl}"",
+      ""headers"": {{
         ""Authorization"": ""Bearer YOUR_TOKEN_HERE""
-      }
-    }
-  }
-}"
-        : @"{
-  ""mcpServers"": {
-    ""local-docs"": {
+      }}
+    }}
+  }}
+}}"
+        : $@"{{
+  ""mcpServers"": {{
+    ""local-docs"": {{
       ""type"": ""http"",
-      ""url"": ""http://localhost:5024/mcp""
-    }
-  }
-}";
+      ""url"": ""{ServerUrl}""
+    }}
+  }}
+}}";
 
     private string OpenCodeJsonConfig => McpOptions.Value.RequireAuthentication
-        ? @"{
+        ? $@"{{
   ""$schema"": ""https://opencode.ai/config.json"",
-  ""mcp"": {
-    ""local-docs"": {
+  ""mcp"": {{
+    ""local-docs"": {{
       ""type"": ""remote"",
-      ""url"": ""http://localhost:5024/mcp"",
-      ""headers"": {
+      ""url"": ""{ServerUrl}"",
+      ""headers"": {{
         ""Authorization"": ""Bearer YOUR_TOKEN_HERE""
-      },
+      }},
       ""enabled"": true
-    }
-  }
-}"
-        : @"{
+    }}
+  }}
+}}"
+        : $@"{{
   ""$schema"": ""https://opencode.ai/config.json"",
-  ""mcp"": {
-    ""local-docs"": {
+  ""mcp"": {{
+    ""local-docs"": {{
       ""type"": ""remote"",
-      ""url"": ""http://localhost:5024/mcp"",
+      ""url"": ""{ServerUrl}"",
       ""enabled"": true
-    }
-  }
-}";
+    }}
+  }}
+}}";
 
     private async Task CopyToClipboardAsync(string text)
     {
