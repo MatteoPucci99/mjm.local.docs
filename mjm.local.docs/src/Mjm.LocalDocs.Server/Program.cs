@@ -18,9 +18,6 @@ using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load optional local settings (not tracked by git)
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
-
 // Add Blazor services
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
