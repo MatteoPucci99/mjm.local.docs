@@ -30,11 +30,11 @@ public sealed class AddDocumentTool
     }
 
     [McpServerTool(Name = "add_document")]
-    [Description("Add a document to a project. Supports .txt, .pdf, and .docx files. The document will be chunked and indexed for semantic search.")]
+    [Description("Add a document to a project. Supports .txt, .md, .pdf, and .docx files. The document will be chunked and indexed for semantic search.")]
     public async Task<string> AddDocumentAsync(
         [Description("The project ID to add the document to")] string projectId,
-        [Description("File name for the document (e.g., 'FRD_v1.5.txt', 'spec.pdf', 'requirements.docx')")] string fileName,
-        [Description("Full text content of the document (for .txt files) or base64-encoded content (for binary files like .pdf, .docx)")] string content,
+        [Description("File name for the document (e.g., 'FRD_v1.5.txt', 'notes.md', 'spec.pdf', 'requirements.docx')")] string fileName,
+        [Description("Full text content of the document (for .txt and .md files) or base64-encoded content (for binary files like .pdf, .docx)")] string content,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectId))
@@ -114,8 +114,9 @@ public sealed class AddDocumentTool
 
     private static byte[] GetFileContent(string content, string fileExtension)
     {
-        // For text files, content is plain text - convert to UTF-8 bytes
-        if (fileExtension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
+        // For text-based files, content is plain text - convert to UTF-8 bytes
+        if (fileExtension.Equals(".txt", StringComparison.OrdinalIgnoreCase) ||
+            fileExtension.Equals(".md", StringComparison.OrdinalIgnoreCase))
         {
             return Encoding.UTF8.GetBytes(content);
         }

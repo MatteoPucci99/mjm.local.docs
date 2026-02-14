@@ -72,6 +72,7 @@ public static class ServiceCollectionExtensions
     {
         // Register individual readers
         services.AddSingleton<PlainTextDocumentReader>();
+        services.AddSingleton<MarkdownDocumentReader>();
         services.AddSingleton<PdfDocumentReader>();
         services.AddSingleton<WordDocumentReader>();
 
@@ -79,6 +80,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CompositeDocumentReader>(sp => new CompositeDocumentReader(
         [
             sp.GetRequiredService<PlainTextDocumentReader>(),
+            sp.GetRequiredService<MarkdownDocumentReader>(),
             sp.GetRequiredService<PdfDocumentReader>(),
             sp.GetRequiredService<WordDocumentReader>()
         ]));
