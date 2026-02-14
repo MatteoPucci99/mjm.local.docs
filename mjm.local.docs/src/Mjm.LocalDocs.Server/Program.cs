@@ -15,8 +15,14 @@ using Mjm.LocalDocs.Server.McpTools;
 using Mjm.LocalDocs.Server.Middleware;
 using ModelContextProtocol.AspNetCore;
 using MudBlazor.Services;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog from appsettings.json
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services));
 
 // Add Blazor services
 builder.Services.AddRazorComponents()
