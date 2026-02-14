@@ -71,10 +71,12 @@ public sealed class EfCoreApiTokenRepository : IApiTokenRepository
     {
         var entities = await _context.ApiTokens
             .AsNoTracking()
-            .OrderByDescending(t => t.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities
+            .OrderByDescending(t => t.CreatedAt)
+            .Select(MapToModel)
+            .ToList();
     }
 
     /// <inheritdoc />
