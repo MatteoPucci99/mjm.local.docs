@@ -97,6 +97,86 @@ public sealed class InMemoryDocumentRepository : IDocumentRepository
         return Task.FromResult(document);
     }
 
+    /// <inheritdoc />
+    public Task SupersedeDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_documents.TryGetValue(documentId, out var existing))
+        {
+            // Create a new Document instance with IsSuperseded = true (init-only)
+            var superseded = new Document
+            {
+                Id = existing.Id,
+                ProjectId = existing.ProjectId,
+                FileName = existing.FileName,
+                FileExtension = existing.FileExtension,
+                FileContent = existing.FileContent,
+                FileStorageLocation = existing.FileStorageLocation,
+                FileSizeBytes = existing.FileSizeBytes,
+                ExtractedText = existing.ExtractedText,
+                ContentHash = existing.ContentHash,
+                Metadata = existing.Metadata,
+                VersionNumber = existing.VersionNumber,
+                ParentDocumentId = existing.ParentDocumentId,
+                IsSuperseded = true,
+                CreatedAt = existing.CreatedAt,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            _documents[documentId] = superseded;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Document>> GetDocumentVersionsAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_documents.TryGetValue(documentId, out var startDoc))
+            return Task.FromResult<IReadOnlyList<Document>>([]);
+
+        // Walk up to find root
+        var rootId = startDoc.Id;
+        var currentParentId = startDoc.ParentDocumentId;
+        var visited = new HashSet<string> { rootId };
+
+        while (!string.IsNullOrEmpty(currentParentId) && visited.Add(currentParentId))
+        {
+            if (!_documents.TryGetValue(currentParentId, out var parent))
+                break;
+
+            rootId = parent.Id;
+            currentParentId = parent.ParentDocumentId;
+        }
+
+        // Walk down from root collecting the chain
+        var chain = new List<Document>();
+        var currentId = rootId;
+        var visitedDown = new HashSet<string>();
+
+        while (!string.IsNullOrEmpty(currentId) && visitedDown.Add(currentId))
+        {
+            if (!_documents.TryGetValue(currentId, out var doc))
+                break;
+
+            chain.Add(doc);
+
+            // Find child that has this document as parent
+            var child = _documents.Values
+                .FirstOrDefault(d => d.ParentDocumentId == currentId);
+
+            currentId = child?.Id;
+        }
+
+        var result = chain
+            .OrderByDescending(d => d.VersionNumber)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<Document>>(result);
+    }
+
     #endregion
 
     #region Chunk Operations

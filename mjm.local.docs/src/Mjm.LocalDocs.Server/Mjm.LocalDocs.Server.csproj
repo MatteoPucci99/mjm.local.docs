@@ -6,6 +6,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.6.0-preview.1" />
     <PackageReference Include="MudBlazor" Version="8.15.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />

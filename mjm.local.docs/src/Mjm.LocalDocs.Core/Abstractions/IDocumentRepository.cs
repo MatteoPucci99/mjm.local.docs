@@ -81,6 +81,27 @@ public interface IDocumentRepository
         string contentHash,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Marks a document as superseded by a newer version.
+    /// Sets IsSuperseded to true and UpdatedAt to current time.
+    /// </summary>
+    /// <param name="documentId">The document identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SupersedeDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all versions in the document chain, traversing ParentDocumentId links.
+    /// Returns documents ordered by VersionNumber descending (newest first).
+    /// </summary>
+    /// <param name="documentId">Any document ID in the version chain.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of all versions ordered by version number descending.</returns>
+    Task<IReadOnlyList<Document>> GetDocumentVersionsAsync(
+        string documentId,
+        CancellationToken cancellationToken = default);
+
     #endregion
 
     #region Chunk Operations

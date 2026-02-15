@@ -32,7 +32,12 @@ public sealed class DocumentServiceTests
 
     #region Helper Methods
 
-    private static Document CreateTestDocument(string id = "doc-1", string projectId = "proj-1")
+    private static Document CreateTestDocument(
+        string id = "doc-1",
+        string projectId = "proj-1",
+        int versionNumber = 1,
+        string? parentDocumentId = null,
+        bool isSuperseded = false)
     {
         return new Document
         {
@@ -42,7 +47,10 @@ public sealed class DocumentServiceTests
             FileExtension = ".txt",
             FileContent = "Test content"u8.ToArray(),
             FileSizeBytes = 12,
-            ExtractedText = "Test content for chunking"
+            ExtractedText = "Test content for chunking",
+            VersionNumber = versionNumber,
+            ParentDocumentId = parentDocumentId,
+            IsSuperseded = isSuperseded
         };
     }
 
@@ -428,6 +436,196 @@ public sealed class DocumentServiceTests
         Assert.Contains("proj-1", result);
         Assert.Contains("proj-2", result);
         Assert.Contains("proj-3", result);
+    }
+
+    #endregion
+
+    #region UpdateDocumentAsync Tests
+
+    [Fact]
+    public async Task UpdateDocumentAsync_WithValidDocument_CreatesNewVersionAndSupersedesOld()
+    {
+        // Arrange
+        var existingDoc = CreateTestDocument("doc-1", "proj-1");
+        var newVersionDoc = CreateTestDocument("doc-2", "proj-1", versionNumber: 2, parentDocumentId: "doc-1");
+        var chunks = new List<DocumentChunk>
+        {
+            CreateTestChunk("doc-2_chunk_0", "doc-2", 0)
+        };
+        var embeddings = new List<ReadOnlyMemory<float>> { CreateTestEmbedding() };
+
+        _repository.GetDocumentAsync("doc-1", Arg.Any<CancellationToken>())
+            .Returns(existingDoc);
+        _repository.AddDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>())
+            .Returns(newVersionDoc);
+        _processor.ChunkDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>())
+            .Returns(chunks);
+        _embeddingService.GenerateEmbeddingsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(embeddings);
+
+        // Act
+        var result = await _sut.UpdateDocumentAsync("doc-1", newVersionDoc);
+
+        // Assert
+        Assert.Equal("doc-2", result.Id);
+
+        // Verify new version was added
+        await _repository.Received(1).AddDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>());
+
+        // Verify old document was superseded
+        await _repository.Received(1).SupersedeDocumentAsync("doc-1", Arg.Any<CancellationToken>());
+
+        // Verify old chunks and embeddings were removed
+        await _vectorStore.Received(1).DeleteByDocumentIdAsync("doc-1", Arg.Any<CancellationToken>());
+        await _repository.Received(1).DeleteChunksByDocumentAsync("doc-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_WhenDocumentNotFound_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var newVersionDoc = CreateTestDocument("doc-2", "proj-1");
+        _repository.GetDocumentAsync("non-existent", Arg.Any<CancellationToken>())
+            .Returns((Document?)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.UpdateDocumentAsync("non-existent", newVersionDoc));
+
+        Assert.Contains("not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_WhenDocumentAlreadySuperseded_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var supersededDoc = CreateTestDocument("doc-1", "proj-1", isSuperseded: true);
+        var newVersionDoc = CreateTestDocument("doc-2", "proj-1");
+
+        _repository.GetDocumentAsync("doc-1", Arg.Any<CancellationToken>())
+            .Returns(supersededDoc);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.UpdateDocumentAsync("doc-1", newVersionDoc));
+
+        Assert.Contains("already superseded", exception.Message);
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_CreatesNewVersion_BeforeSupersedingOld()
+    {
+        // Arrange - verify ordering: add new first, then supersede old
+        var existingDoc = CreateTestDocument("doc-1", "proj-1");
+        var newVersionDoc = CreateTestDocument("doc-2", "proj-1", versionNumber: 2, parentDocumentId: "doc-1");
+        var emptyChunks = new List<DocumentChunk>();
+
+        _repository.GetDocumentAsync("doc-1", Arg.Any<CancellationToken>())
+            .Returns(existingDoc);
+        _repository.AddDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>())
+            .Returns(newVersionDoc);
+        _processor.ChunkDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>())
+            .Returns(emptyChunks);
+
+        // Act
+        await _sut.UpdateDocumentAsync("doc-1", newVersionDoc);
+
+        // Assert - AddDocumentAsync should be called before SupersedeDocumentAsync
+        Received.InOrder(() =>
+        {
+            _repository.AddDocumentAsync(newVersionDoc, Arg.Any<CancellationToken>());
+            _repository.SupersedeDocumentAsync("doc-1", Arg.Any<CancellationToken>());
+        });
+    }
+
+    #endregion
+
+    #region SearchAsync Superseded Filter Tests
+
+    [Fact]
+    public async Task SearchAsync_ExcludesSupersededDocuments()
+    {
+        // Arrange
+        var query = "test query";
+        var queryEmbedding = CreateTestEmbedding();
+        var vectorResults = new List<VectorSearchResult>
+        {
+            new() { ChunkId = "chunk-1", Score = 0.95 },
+            new() { ChunkId = "chunk-2", Score = 0.85 }
+        };
+        var chunks = new List<DocumentChunk>
+        {
+            CreateTestChunk("chunk-1", "doc-1", 0),
+            CreateTestChunk("chunk-2", "doc-2", 0)
+        };
+        var activeDoc = CreateTestDocument("doc-1", "proj-1");
+        var supersededDoc = CreateTestDocument("doc-2", "proj-1", isSuperseded: true);
+
+        _embeddingService.GenerateEmbeddingAsync(query, Arg.Any<CancellationToken>())
+            .Returns(queryEmbedding);
+        _vectorStore.SearchAsync(queryEmbedding, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(vectorResults);
+        _repository.GetChunksByIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(chunks);
+        _repository.GetDocumentAsync("doc-1", Arg.Any<CancellationToken>())
+            .Returns(activeDoc);
+        _repository.GetDocumentAsync("doc-2", Arg.Any<CancellationToken>())
+            .Returns(supersededDoc);
+
+        // Act
+        var results = await _sut.SearchAsync(query, limit: 10);
+
+        // Assert - only the active document's chunk should be returned
+        Assert.Single(results);
+        Assert.Equal("chunk-1", results[0].Chunk.Id);
+        Assert.Equal(0.95, results[0].Score);
+    }
+
+    #endregion
+
+    #region GetDocumentsByProjectAsync Filter Tests
+
+    [Fact]
+    public async Task GetDocumentsByProjectAsync_WithIncludeSupersededFalse_FiltersOutSupersededDocuments()
+    {
+        // Arrange
+        var projectId = "proj-1";
+        var documents = new List<Document>
+        {
+            CreateTestDocument("doc-1", projectId),
+            CreateTestDocument("doc-2", projectId, isSuperseded: true),
+            CreateTestDocument("doc-3", projectId)
+        };
+        _repository.GetDocumentsByProjectAsync(projectId, Arg.Any<CancellationToken>())
+            .Returns(documents);
+
+        // Act
+        var result = await _sut.GetDocumentsByProjectAsync(projectId, includeSuperseded: false);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.All(result, d => Assert.False(d.IsSuperseded));
+    }
+
+    [Fact]
+    public async Task GetDocumentsByProjectAsync_WithIncludeSupersededTrue_ReturnsAllDocuments()
+    {
+        // Arrange
+        var projectId = "proj-1";
+        var documents = new List<Document>
+        {
+            CreateTestDocument("doc-1", projectId),
+            CreateTestDocument("doc-2", projectId, isSuperseded: true),
+            CreateTestDocument("doc-3", projectId)
+        };
+        _repository.GetDocumentsByProjectAsync(projectId, Arg.Any<CancellationToken>())
+            .Returns(documents);
+
+        // Act
+        var result = await _sut.GetDocumentsByProjectAsync(projectId, includeSuperseded: true);
+
+        // Assert
+        Assert.Equal(3, result.Count);
     }
 
     #endregion

@@ -121,11 +121,12 @@
          var projects = await ProjectRepository.GetAllAsync();
          _projects.Clear();
 
-         foreach (var project in projects)
-         {
-             var docs = await DocumentRepository.GetDocumentsByProjectAsync(project.Id);
-             _projects.Add(new ProjectListItem(project, docs.Count));
-         }
+          foreach (var project in projects)
+          {
+              var docs = await DocumentRepository.GetDocumentsByProjectAsync(project.Id);
+              var activeCount = docs.Count(d => !d.IsSuperseded);
+              _projects.Add(new ProjectListItem(project, activeCount));
+          }
 
          _loading = false;
      }

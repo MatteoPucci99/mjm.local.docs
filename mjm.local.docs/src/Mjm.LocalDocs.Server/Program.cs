@@ -56,6 +56,7 @@ builder.Services
     .WithTools<ProjectTools>()
     .WithTools<AddDocumentTool>()
     .WithTools<DocumentTools>()
+    .WithTools<UpdateDocumentTool>()
     .WithTools<ListProjectsTool>()
     .WithTools<SearchDocsTool>();
 
@@ -96,7 +97,59 @@ using (var scope = app.Services.CreateScope())
         context = factory?.CreateDbContext();
     }
     
-    context?.Database.EnsureCreated();
+    if (context is not null)
+    {
+        // Use Migrate() instead of EnsureCreated() to support incremental schema upgrades.
+        // For databases created with EnsureCreated() before migrations were introduced,
+        // we check if the migrations history table exists. If not, we create it and mark
+        // the InitialCreate migration as already applied (since the schema already exists).
+        var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+        var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
+        
+        if (!appliedMigrations.Any() && pendingMigrations.Contains("20260215174229_InitialCreate"))
+        {
+            // Database was created with EnsureCreated() — tables exist but no migration history.
+            // Check if a known table exists to confirm this is a pre-migration database.
+            var tableExists = false;
+            try
+            {
+                var conn = context.Database.GetDbConnection();
+                await conn.OpenAsync();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = context.Database.IsSqlServer()
+                    ? "SELECT CASE WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Projects') THEN 1 ELSE 0 END"
+                    : "SELECT CASE WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='Projects') THEN 1 ELSE 0 END";
+                var result = await cmd.ExecuteScalarAsync();
+                tableExists = Convert.ToInt64(result) == 1;
+            }
+            catch
+            {
+                // If check fails, proceed with normal migration (will create tables)
+            }
+            
+            if (tableExists)
+            {
+                // Mark InitialCreate as already applied without executing it
+                await context.Database.ExecuteSqlRawAsync(
+                    "CREATE TABLE IF NOT EXISTS \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL)");
+                await context.Database.ExecuteSqlRawAsync(
+                    "INSERT OR IGNORE INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('20260215174229_InitialCreate', '10.0.2')");
+                
+                // Now apply only the remaining pending migrations
+                await context.Database.MigrateAsync();
+            }
+            else
+            {
+                // Fresh database — apply all migrations
+                await context.Database.MigrateAsync();
+            }
+        }
+        else
+        {
+            // Normal case: migrations are already being tracked, apply pending ones
+            await context.Database.MigrateAsync();
+        }
+    }
 
     // Initialize vector store (chunk_embeddings table for SQL Server, etc.)
     var vectorStore = scope.ServiceProvider.GetRequiredService<IVectorStore>();

@@ -97,7 +97,22 @@ else
         <MudItem xs="12" md="8">
             <MudPaper Class="pa-4" Elevation="2">
                 <div class="d-flex justify-space-between align-center mb-4">
-                    <MudText Typo="Typo.h6">Documenti (@_documents.Count)</MudText>
+                    <MudText Typo="Typo.h6">
+                        Documenti (@ActiveDocumentCount)
+                        @if (SupersededDocumentCount > 0)
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-2 mud-text-secondary" Style="display: inline;">
+                                + @SupersededDocumentCount versioni precedenti
+                            </MudText>
+                        }
+                    </MudText>
+                    @if (SupersededDocumentCount > 0)
+                    {
+                        <MudSwitch @bind-Value="_showSuperseded" 
+                                   Label="Mostra versioni precedenti" 
+                                   Color="Color.Primary"
+                                   Size="Size.Small" />
+                    }
                 </div>
 
                 @* File Upload Area with Drag-and-Drop Support *@
@@ -157,7 +172,8 @@ else
                                  Hideable="false"
                                  Dense="true"
                                  Striped="true"
-                                 Hover="true">
+                                 Hover="true"
+                                 RowStyleFunc="@GetRowStyle">
                         <Columns>
                             <PropertyColumn Property="x => x.FileName" Title="Nome File" Sortable="true">
                                 <CellTemplate>
@@ -170,6 +186,22 @@ else
                                             @context.Item.FileName
                                         </MudText>
                                     </div>
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.VersionNumber" Title="Versione" Sortable="true">
+                                <CellTemplate>
+                                    <MudChip T="string"
+                                             Size="Size.Small"
+                                             Color="@(context.Item.IsSuperseded ? Color.Default : Color.Primary)"
+                                             Variant="Variant.Outlined">
+                                        v@(context.Item.VersionNumber)
+                                    </MudChip>
+                                    @if (context.Item.IsSuperseded)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled" Class="ml-1">
+                                            Sostituito
+                                        </MudChip>
+                                    }
                                 </CellTemplate>
                             </PropertyColumn>
                             <PropertyColumn Property="x => x.FileExtension" Title="Tipo" Sortable="true" />
@@ -185,6 +217,25 @@ else
                             </PropertyColumn>
                             <TemplateColumn Title="Azioni" Sortable="false">
                                 <CellTemplate>
+                                    @if (context.Item.VersionNumber > 1 || context.Item.ParentDocumentId is not null 
+                                         || _documents.Any(d => d.ParentDocumentId == context.Item.Id))
+                                    {
+                                        <MudTooltip Text="Cronologia versioni">
+                                            <MudIconButton Icon="@Icons.Material.Filled.History"
+                                                           Size="Size.Small"
+                                                           Color="Color.Info"
+                                                           OnClick="@(() => ShowVersionHistoryAsync(context.Item))" />
+                                        </MudTooltip>
+                                    }
+                                    @if (!context.Item.IsSuperseded)
+                                    {
+                                        <MudTooltip Text="Carica nuova versione">
+                                            <MudIconButton Icon="@Icons.Material.Filled.UploadFile"
+                                                           Size="Size.Small"
+                                                           Color="Color.Tertiary"
+                                                           OnClick="@(() => UpdateDocumentAsync(context.Item))" />
+                                        </MudTooltip>
+                                    }
                                     <MudTooltip Text="Scarica">
                                         <MudIconButton Icon="@Icons.Material.Filled.Download"
                                                        Size="Size.Small"
@@ -219,21 +270,34 @@ else
     private readonly ProjectEditModel _editModel = new();
     private string? _nameError;
     private string _searchText = string.Empty;
+    private bool _showSuperseded;
     private List<BreadcrumbItem> _breadcrumbs = [];
     
     // Drag-and-drop support
     private string _dragClass = string.Empty;
     private const string DefaultDragClass = "mud-border-primary";
+    
+    private int ActiveDocumentCount => _documents.Count(d => !d.IsSuperseded);
+    private int SupersededDocumentCount => _documents.Count(d => d.IsSuperseded);
 
     private void SetDragClass() => _dragClass = DefaultDragClass;
     private void ClearDragClass() => _dragClass = string.Empty;
     private string GetDropzoneClass() => $"pa-8 d-flex flex-column align-center justify-center cursor-pointer border-dashed {_dragClass}";
 
-    private IEnumerable<Document> FilteredDocuments => string.IsNullOrWhiteSpace(_searchText)
-        ? _documents.OrderByDescending(d => d.CreatedAt)
-        : _documents
-            .Where(d => d.FileName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(d => d.CreatedAt);
+    private IEnumerable<Document> FilteredDocuments
+    {
+        get
+        {
+            var docs = _showSuperseded 
+                ? _documents 
+                : _documents.Where(d => !d.IsSuperseded);
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+                docs = docs.Where(d => d.FileName.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+            return docs.OrderByDescending(d => d.CreatedAt);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -478,6 +542,105 @@ else
                 Snackbar.Add("Errore durante l'eliminazione del documento.", Severity.Error);
             }
         }
+    }
+
+    private async Task UpdateDocumentAsync(Document document)
+    {
+        if (_project is null) return;
+
+        var parameters = new DialogParameters<UpdateDocumentDialog>
+        {
+            { x => x.Document, document }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<UpdateDocumentDialog>(
+            "Aggiorna Documento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: UpdateDocumentDialog.UpdateDocumentResult uploadResult })
+        {
+            try
+            {
+                // Extract text from the new file
+                var fileExtension = Path.GetExtension(uploadResult.FileName).ToLowerInvariant();
+                string extractedText;
+
+                if (DocumentReader.CanRead(fileExtension))
+                {
+                    var extractionResult = await DocumentReader.ExtractTextAsync(uploadResult.FileContent, fileExtension);
+                    if (!extractionResult.Success)
+                    {
+                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Estrazione testo fallita");
+                    }
+                    extractedText = extractionResult.Text;
+                }
+                else
+                {
+                    extractedText = Encoding.UTF8.GetString(uploadResult.FileContent);
+                }
+
+                var contentHash = ComputeHash(uploadResult.FileContent);
+
+                var newVersionDocument = new Document
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ProjectId = _project.Id,
+                    FileName = uploadResult.FileName,
+                    FileExtension = fileExtension,
+                    FileContent = uploadResult.FileContent,
+                    FileSizeBytes = uploadResult.FileContent.Length,
+                    ExtractedText = extractedText,
+                    ContentHash = contentHash,
+                    VersionNumber = document.VersionNumber + 1,
+                    ParentDocumentId = document.Id
+                };
+
+                await DocumentService.UpdateDocumentAsync(document.Id, newVersionDocument);
+
+                // Reload documents
+                _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
+                StateHasChanged();
+
+                Snackbar.Add($"Documento \"{uploadResult.FileName}\" aggiornato a v{newVersionDocument.VersionNumber}!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Errore durante l'aggiornamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static string GetRowStyle(Document document, int _)
+    {
+        return document.IsSuperseded ? "opacity: 0.55;" : string.Empty;
+    }
+
+    private async Task ShowVersionHistoryAsync(Document document)
+    {
+        var versions = await DocumentService.GetDocumentVersionsAsync(document.Id);
+        
+        var parameters = new DialogParameters<DocumentVersionHistoryDialog>
+        {
+            { x => x.Versions, versions },
+            { x => x.CurrentDocumentId, document.Id }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        await DialogService.ShowAsync<DocumentVersionHistoryDialog>(
+            "Cronologia Versioni", parameters, options);
     }
 
     private static string FormatFileSize(long bytes)

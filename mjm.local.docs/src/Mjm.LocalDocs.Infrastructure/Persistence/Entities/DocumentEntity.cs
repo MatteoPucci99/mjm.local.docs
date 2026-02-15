@@ -22,6 +22,9 @@ public sealed class DocumentEntity
     public required string ExtractedText { get; set; }
     public string? ContentHash { get; set; }
     public string? MetadataJson { get; set; }
+    public int VersionNumber { get; set; }
+    public string? ParentDocumentId { get; set; }
+    public bool IsSuperseded { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 

@@ -159,9 +159,10 @@ else
         foreach (var project in projects)
         {
             var docs = await DocumentRepository.GetDocumentsByProjectAsync(project.Id);
-            _projectDocumentCounts[project.Id] = docs.Count;
-            _documentCount += docs.Count;
-            _totalSize += docs.Sum(d => d.FileSizeBytes);
+            var activeDocs = docs.Where(d => !d.IsSuperseded).ToList();
+            _projectDocumentCounts[project.Id] = activeDocs.Count;
+            _documentCount += activeDocs.Count;
+            _totalSize += activeDocs.Sum(d => d.FileSizeBytes);
         }
 
         _loading = false;
