@@ -100,8 +100,7 @@ public sealed class LocalDocsDbContext : DbContext
             entity.Property(e => e.ContentHash)
                 .HasMaxLength(64); // SHA256 hex string
 
-            entity.Property(e => e.MetadataJson)
-                .HasColumnType("TEXT");
+            entity.Property(e => e.MetadataJson);
 
             entity.Property(e => e.VersionNumber)
                 .IsRequired()

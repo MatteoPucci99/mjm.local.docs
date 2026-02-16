@@ -130,10 +130,30 @@ using (var scope = app.Services.CreateScope())
             if (tableExists)
             {
                 // Mark InitialCreate as already applied without executing it
-                await context.Database.ExecuteSqlRawAsync(
-                    "CREATE TABLE IF NOT EXISTS \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL)");
-                await context.Database.ExecuteSqlRawAsync(
-                    "INSERT OR IGNORE INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('20260215174229_InitialCreate', '10.0.2')");
+                if (context.Database.IsSqlServer())
+                {
+                    await context.Database.ExecuteSqlRawAsync(
+                        """
+                        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '__EFMigrationsHistory')
+                        CREATE TABLE [__EFMigrationsHistory] (
+                            [MigrationId] NVARCHAR(150) NOT NULL,
+                            [ProductVersion] NVARCHAR(32) NOT NULL,
+                            CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
+                        )
+                        """);
+                    await context.Database.ExecuteSqlRawAsync(
+                        """
+                        IF NOT EXISTS (SELECT 1 FROM [__EFMigrationsHistory] WHERE [MigrationId] = '20260215174229_InitialCreate')
+                        INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion]) VALUES ('20260215174229_InitialCreate', '10.0.2')
+                        """);
+                }
+                else
+                {
+                    await context.Database.ExecuteSqlRawAsync(
+                        "CREATE TABLE IF NOT EXISTS \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL)");
+                    await context.Database.ExecuteSqlRawAsync(
+                        "INSERT OR IGNORE INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('20260215174229_InitialCreate', '10.0.2')");
+                }
                 
                 // Now apply only the remaining pending migrations
                 await context.Database.MigrateAsync();

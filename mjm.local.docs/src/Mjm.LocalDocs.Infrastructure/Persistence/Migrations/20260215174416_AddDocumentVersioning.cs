@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -13,21 +13,18 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsSuperseded",
                 table: "Documents",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: false);
 
             migrationBuilder.AddColumn<string>(
                 name: "ParentDocumentId",
                 table: "Documents",
-                type: "TEXT",
                 maxLength: 36,
                 nullable: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "VersionNumber",
                 table: "Documents",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: 1);
 

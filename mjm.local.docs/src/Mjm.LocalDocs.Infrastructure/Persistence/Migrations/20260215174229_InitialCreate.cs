@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -15,14 +15,14 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                 name: "ApiTokens",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", maxLength: 36, nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    TokenHash = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
-                    TokenPrefix = table.Column<string>(type: "TEXT", maxLength: 10, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    LastUsedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    IsRevoked = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: false)
+                    Id = table.Column<string>(maxLength: 36, nullable: false),
+                    Name = table.Column<string>(maxLength: 200, nullable: false),
+                    TokenHash = table.Column<string>(maxLength: 64, nullable: false),
+                    TokenPrefix = table.Column<string>(maxLength: 10, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(nullable: true),
+                    LastUsedAt = table.Column<DateTimeOffset>(nullable: true),
+                    IsRevoked = table.Column<bool>(nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
@@ -33,11 +33,11 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                 name: "Projects",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", maxLength: 36, nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    Description = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    Id = table.Column<string>(maxLength: 36, nullable: false),
+                    Name = table.Column<string>(maxLength: 200, nullable: false),
+                    Description = table.Column<string>(maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(nullable: true)
                 },
                 constraints: table =>
                 {
@@ -48,18 +48,18 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                 name: "Documents",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", maxLength: 36, nullable: false),
-                    ProjectId = table.Column<string>(type: "TEXT", maxLength: 36, nullable: false),
-                    FileName = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
-                    FileExtension = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
-                    FileContent = table.Column<byte[]>(type: "BLOB", nullable: true),
-                    FileStorageLocation = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    FileSizeBytes = table.Column<long>(type: "INTEGER", nullable: false),
-                    ExtractedText = table.Column<string>(type: "TEXT", nullable: false),
-                    ContentHash = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
-                    MetadataJson = table.Column<string>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    Id = table.Column<string>(maxLength: 36, nullable: false),
+                    ProjectId = table.Column<string>(maxLength: 36, nullable: false),
+                    FileName = table.Column<string>(maxLength: 500, nullable: false),
+                    FileExtension = table.Column<string>(maxLength: 20, nullable: false),
+                    FileContent = table.Column<byte[]>(nullable: true),
+                    FileStorageLocation = table.Column<string>(maxLength: 1000, nullable: true),
+                    FileSizeBytes = table.Column<long>(nullable: false),
+                    ExtractedText = table.Column<string>(nullable: false),
+                    ContentHash = table.Column<string>(maxLength: 64, nullable: true),
+                    MetadataJson = table.Column<string>(nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(nullable: true)
                 },
                 constraints: table =>
                 {
@@ -76,12 +76,12 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                 name: "DocumentChunks",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    DocumentId = table.Column<string>(type: "TEXT", maxLength: 36, nullable: false),
-                    Content = table.Column<string>(type: "TEXT", nullable: false),
-                    FileName = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
-                    ChunkIndex = table.Column<int>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    Id = table.Column<string>(maxLength: 100, nullable: false),
+                    DocumentId = table.Column<string>(maxLength: 36, nullable: false),
+                    Content = table.Column<string>(nullable: false),
+                    FileName = table.Column<string>(maxLength: 500, nullable: true),
+                    ChunkIndex = table.Column<int>(nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(nullable: false)
                 },
                 constraints: table =>
                 {
