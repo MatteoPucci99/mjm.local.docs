@@ -116,33 +116,51 @@ else
                 </div>
 
                 @* File Upload Area with Drag-and-Drop Support *@
-                <MudPaper @ondragenter="@SetDragClass"
-                          @ondragleave="@ClearDragClass"
-                          @ondragend="@ClearDragClass"
-                          Outlined="true"
-                          Class="@GetDropzoneClass()"
-                          Style="border-width: 2px; min-height: 120px; position: relative;">
-                    <InputFile OnChange="OnInputFileChanged"
-                               multiple
-                               accept=".txt,.md,.pdf,.docx,.html,.htm,.json,.xml,.csv"
-                               class="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                               style="opacity: 0; cursor: pointer;" />
-                    @if (_uploading)
-                    {
-                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
-                        <MudText Typo="Typo.body2" Class="mt-2">Caricamento in corso...</MudText>
-                    }
-                    else
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
-                        <MudText Typo="Typo.body1" Class="mt-2">
-                            Trascina i file qui o clicca per selezionare
-                        </MudText>
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                            Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
-                        </MudText>
-                    }
-                </MudPaper>
+                <MudGrid Class="mb-0">
+                    <MudItem xs="12" md="8">
+                        <MudPaper @ondragenter="@SetDragClass"
+                                  @ondragleave="@ClearDragClass"
+                                  @ondragend="@ClearDragClass"
+                                  Outlined="true"
+                                  Class="@GetDropzoneClass()"
+                                  Style="border-width: 2px; min-height: 120px; position: relative;">
+                            <InputFile OnChange="OnInputFileChanged"
+                                       multiple
+                                       accept=".txt,.md,.pdf,.docx,.html,.htm,.json,.xml,.csv"
+                                       class="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                                       style="opacity: 0; cursor: pointer;" />
+                            @if (_uploading)
+                            {
+                                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                                <MudText Typo="Typo.body2" Class="mt-2">Caricamento in corso...</MudText>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.body1" Class="mt-2">
+                                    Trascina i file qui o clicca per selezionare
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
+                                </MudText>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Outlined="true"
+                                  Class="pa-8 d-flex flex-column align-center justify-center cursor-pointer border-dashed"
+                                  Style="border-width: 2px; min-height: 120px;"
+                                  @onclick="AddKnowHowAsync">
+                            <MudIcon Icon="@Icons.Material.Filled.NoteAdd" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Typo="Typo.body1" Class="mt-2">
+                                Aggiungi Know How
+                            </MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                Scrivi un documento direttamente dalla UI
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
 
                 @* Search and Filter *@
                 <MudTextField @bind-Value="_searchText"
@@ -229,6 +247,15 @@ else
                                     }
                                     @if (!context.Item.IsSuperseded)
                                     {
+                                        @if (IsTextDocument(context.Item.FileExtension))
+                                        {
+                                            <MudTooltip Text="Modifica know how">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                               Size="Size.Small"
+                                                               Color="Color.Warning"
+                                                               OnClick="@(() => EditKnowHowAsync(context.Item))" />
+                                            </MudTooltip>
+                                        }
                                         <MudTooltip Text="Carica nuova versione">
                                             <MudIconButton Icon="@Icons.Material.Filled.UploadFile"
                                                            Size="Size.Small"
@@ -641,6 +668,148 @@ else
         
         await DialogService.ShowAsync<DocumentVersionHistoryDialog>(
             "Cronologia Versioni", parameters, options);
+    }
+
+    private async Task AddKnowHowAsync()
+    {
+        if (_project is null) return;
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AddKnowHowDialog>(
+            "Aggiungi Know How", options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: AddKnowHowDialog.AddKnowHowResult knowHowResult })
+        {
+            try
+            {
+                var fileName = SanitizeFileName(knowHowResult.Title) + ".md";
+                var contentBytes = Encoding.UTF8.GetBytes(knowHowResult.Content);
+                var contentHash = ComputeHash(contentBytes);
+
+                var document = new Document
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ProjectId = _project.Id,
+                    FileName = fileName,
+                    FileExtension = ".md",
+                    FileContent = contentBytes,
+                    FileSizeBytes = contentBytes.Length,
+                    ExtractedText = knowHowResult.Content,
+                    ContentHash = contentHash
+                };
+
+                await DocumentService.AddDocumentAsync(document);
+
+                // Reload documents
+                _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
+                StateHasChanged();
+
+                Snackbar.Add($"Know how \"{knowHowResult.Title}\" creato con successo!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Errore durante la creazione del know how: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task EditKnowHowAsync(Document document)
+    {
+        if (_project is null) return;
+
+        var parameters = new DialogParameters<EditKnowHowDialog>
+        {
+            { x => x.Document, document }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<EditKnowHowDialog>(
+            "Modifica Know How", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: EditKnowHowDialog.EditKnowHowResult editResult })
+        {
+            try
+            {
+                var fileName = SanitizeFileName(editResult.Title) + ".md";
+                var contentBytes = Encoding.UTF8.GetBytes(editResult.Content);
+                var contentHash = ComputeHash(contentBytes);
+
+                var newVersionDocument = new Document
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ProjectId = _project.Id,
+                    FileName = fileName,
+                    FileExtension = ".md",
+                    FileContent = contentBytes,
+                    FileSizeBytes = contentBytes.Length,
+                    ExtractedText = editResult.Content,
+                    ContentHash = contentHash,
+                    VersionNumber = document.VersionNumber + 1,
+                    ParentDocumentId = document.Id
+                };
+
+                await DocumentService.UpdateDocumentAsync(document.Id, newVersionDocument);
+
+                // Reload documents
+                _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
+                StateHasChanged();
+
+                Snackbar.Add($"Know how \"{editResult.Title}\" aggiornato a v{newVersionDocument.VersionNumber}!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Errore durante l'aggiornamento del know how: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static bool IsTextDocument(string fileExtension) =>
+        fileExtension.ToLowerInvariant() is ".md" or ".txt";
+
+    private static string SanitizeFileName(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return "know-how";
+
+        // Replace spaces and common separators with dashes
+        var sanitized = title.Trim()
+            .Replace(' ', '-')
+            .Replace('/', '-')
+            .Replace('\\', '-');
+
+        // Remove invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        foreach (var c in invalidChars)
+        {
+            sanitized = sanitized.Replace(c.ToString(), string.Empty);
+        }
+
+        // Collapse multiple dashes
+        while (sanitized.Contains("--"))
+            sanitized = sanitized.Replace("--", "-");
+
+        // Trim dashes from start/end
+        sanitized = sanitized.Trim('-');
+
+        // Truncate to reasonable length
+        if (sanitized.Length > 100)
+            sanitized = sanitized[..100].TrimEnd('-');
+
+        return string.IsNullOrEmpty(sanitized) ? "know-how" : sanitized;
     }
 
     private static string FormatFileSize(long bytes)
