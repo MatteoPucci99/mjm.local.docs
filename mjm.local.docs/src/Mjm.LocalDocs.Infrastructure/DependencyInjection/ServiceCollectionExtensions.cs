@@ -1,3 +1,5 @@
+using System.ClientModel;
+using Azure.AI.OpenAI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -70,6 +72,7 @@ public static class ServiceCollectionExtensions
     {
         // Register individual readers
         services.AddSingleton<PlainTextDocumentReader>();
+        services.AddSingleton<MarkdownDocumentReader>();
         services.AddSingleton<PdfDocumentReader>();
         services.AddSingleton<WordDocumentReader>();
 
@@ -77,6 +80,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CompositeDocumentReader>(sp => new CompositeDocumentReader(
         [
             sp.GetRequiredService<PlainTextDocumentReader>(),
+            sp.GetRequiredService<MarkdownDocumentReader>(),
             sp.GetRequiredService<PdfDocumentReader>(),
             sp.GetRequiredService<WordDocumentReader>()
         ]));
@@ -208,23 +212,15 @@ public static class ServiceCollectionExtensions
         switch (embeddingsOptions.Provider)
         {
             case EmbeddingProvider.OpenAI:
-                var apiKey = embeddingsOptions.OpenAI.ApiKey
-                    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                ConfigureOpenAIEmbeddings(services, embeddingsOptions);
+                break;
 
-                if (string.IsNullOrEmpty(apiKey))
-                {
-                    throw new InvalidOperationException(
-                        "OpenAI embedding provider requires an API key. " +
-                        "Configure 'LocalDocs:Embeddings:OpenAI:ApiKey' in appsettings.json " +
-                        "or set the OPENAI_API_KEY environment variable.");
-                }
+            case EmbeddingProvider.AzureOpenAI:
+                ConfigureAzureOpenAIEmbeddings(services, embeddingsOptions);
+                break;
 
-                var openAiClient = new OpenAIClient(apiKey);
-                var embeddingGenerator = openAiClient.GetEmbeddingClient(embeddingsOptions.OpenAI.Model)
-                    .AsIEmbeddingGenerator();
-
-                services.AddSingleton<IEmbeddingService>(
-                    new SemanticKernelEmbeddingService(embeddingGenerator, embeddingsOptions.Dimension));
+            case EmbeddingProvider.Ollama:
+                ConfigureOllamaEmbeddings(services, embeddingsOptions);
                 break;
 
             case EmbeddingProvider.Fake:
@@ -233,6 +229,80 @@ public static class ServiceCollectionExtensions
                     new FakeEmbeddingService(embeddingsOptions.Dimension));
                 break;
         }
+    }
+
+    private static void ConfigureOpenAIEmbeddings(
+        IServiceCollection services,
+        EmbeddingsOptions embeddingsOptions)
+    {
+        var apiKey = embeddingsOptions.OpenAI.ApiKey
+            ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new InvalidOperationException(
+                "OpenAI embedding provider requires an API key. " +
+                "Configure 'LocalDocs:Embeddings:OpenAI:ApiKey' in appsettings.json " +
+                "or set the OPENAI_API_KEY environment variable.");
+        }
+
+        var openAiClient = new OpenAIClient(apiKey);
+        var embeddingGenerator = openAiClient.GetEmbeddingClient(embeddingsOptions.OpenAI.Model)
+            .AsIEmbeddingGenerator();
+
+        services.AddSingleton<IEmbeddingService>(
+            new SemanticKernelEmbeddingService(embeddingGenerator, embeddingsOptions.Dimension));
+    }
+
+    private static void ConfigureAzureOpenAIEmbeddings(
+        IServiceCollection services,
+        EmbeddingsOptions embeddingsOptions)
+    {
+        var endpoint = embeddingsOptions.AzureOpenAI.Endpoint
+            ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+
+        var apiKey = embeddingsOptions.AzureOpenAI.ApiKey
+            ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            throw new InvalidOperationException(
+                "Azure OpenAI embedding provider requires an endpoint. " +
+                "Configure 'LocalDocs:Embeddings:AzureOpenAI:Endpoint' in appsettings.json " +
+                "or set the AZURE_OPENAI_ENDPOINT environment variable.");
+        }
+
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new InvalidOperationException(
+                "Azure OpenAI embedding provider requires an API key. " +
+                "Configure 'LocalDocs:Embeddings:AzureOpenAI:ApiKey' in appsettings.json " +
+                "or set the AZURE_OPENAI_API_KEY environment variable.");
+        }
+
+        var azureClient = new AzureOpenAIClient(
+            new Uri(endpoint),
+            new ApiKeyCredential(apiKey));
+
+        var embeddingGenerator = azureClient
+            .GetEmbeddingClient(embeddingsOptions.AzureOpenAI.DeploymentName)
+            .AsIEmbeddingGenerator();
+
+        services.AddSingleton<IEmbeddingService>(
+            new SemanticKernelEmbeddingService(embeddingGenerator, embeddingsOptions.Dimension));
+    }
+
+    private static void ConfigureOllamaEmbeddings(
+        IServiceCollection services,
+        EmbeddingsOptions embeddingsOptions)
+    {
+        var endpoint = new Uri(embeddingsOptions.Ollama.Endpoint);
+        var model = embeddingsOptions.Ollama.Model;
+
+        var embeddingGenerator = new OllamaEmbeddingGenerator(endpoint, model);
+
+        services.AddSingleton<IEmbeddingService>(
+            new SemanticKernelEmbeddingService(embeddingGenerator, embeddingsOptions.Dimension));
     }
 
     /// <summary>

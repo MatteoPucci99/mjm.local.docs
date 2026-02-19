@@ -66,6 +66,16 @@ public sealed class EmbeddingsOptions
     /// OpenAI-specific configuration.
     /// </summary>
     public OpenAIEmbeddingsOptions OpenAI { get; init; } = new();
+
+    /// <summary>
+    /// Azure OpenAI-specific configuration.
+    /// </summary>
+    public AzureOpenAIEmbeddingsOptions AzureOpenAI { get; init; } = new();
+
+    /// <summary>
+    /// Ollama-specific configuration.
+    /// </summary>
+    public OllamaEmbeddingsOptions Ollama { get; init; } = new();
 }
 
 /// <summary>
@@ -81,7 +91,17 @@ public enum EmbeddingProvider
     /// <summary>
     /// OpenAI embeddings API.
     /// </summary>
-    OpenAI
+    OpenAI,
+
+    /// <summary>
+    /// Azure OpenAI Service embeddings.
+    /// </summary>
+    AzureOpenAI,
+
+    /// <summary>
+    /// Ollama local embeddings (e.g., nomic-embed-text, mxbai-embed-large).
+    /// </summary>
+    Ollama
 }
 
 /// <summary>
@@ -98,6 +118,45 @@ public sealed class OpenAIEmbeddingsOptions
     /// The model to use for embeddings.
     /// </summary>
     public string Model { get; init; } = "text-embedding-3-small";
+}
+
+/// <summary>
+/// Azure OpenAI Service embedding configuration.
+/// </summary>
+public sealed class AzureOpenAIEmbeddingsOptions
+{
+    /// <summary>
+    /// Azure OpenAI endpoint URL (e.g., https://your-resource.openai.azure.com/).
+    /// Can also be set via environment variable AZURE_OPENAI_ENDPOINT.
+    /// </summary>
+    public string? Endpoint { get; init; }
+
+    /// <summary>
+    /// Azure OpenAI API key.
+    /// Can also be set via environment variable AZURE_OPENAI_API_KEY.
+    /// </summary>
+    public string? ApiKey { get; init; }
+
+    /// <summary>
+    /// The deployment name for the embedding model.
+    /// </summary>
+    public string DeploymentName { get; init; } = "text-embedding-3-small";
+}
+
+/// <summary>
+/// Ollama local embedding configuration.
+/// </summary>
+public sealed class OllamaEmbeddingsOptions
+{
+    /// <summary>
+    /// Ollama server endpoint URL.
+    /// </summary>
+    public string Endpoint { get; init; } = "http://localhost:11434";
+
+    /// <summary>
+    /// The embedding model to use (e.g., nomic-embed-text, mxbai-embed-large, all-minilm).
+    /// </summary>
+    public string Model { get; init; } = "nomic-embed-text";
 }
 
 /// <summary>

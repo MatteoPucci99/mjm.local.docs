@@ -40,6 +40,9 @@ public sealed class EfCoreDocumentRepository : IDocumentRepository
             MetadataJson = document.Metadata != null
                 ? JsonSerializer.Serialize(document.Metadata)
                 : null,
+            VersionNumber = document.VersionNumber,
+            ParentDocumentId = document.ParentDocumentId,
+            IsSuperseded = document.IsSuperseded,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt
         };
@@ -130,6 +133,88 @@ public sealed class EfCoreDocumentRepository : IDocumentRepository
                 cancellationToken);
 
         return entity == null ? null : MapToModel(entity);
+    }
+
+    /// <inheritdoc />
+    public async Task SupersedeDocumentAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _context.Documents
+            .FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+
+        if (entity is null)
+            return;
+
+        entity.IsSuperseded = true;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Document>> GetDocumentVersionsAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        // Start from the given document
+        var startDoc = await _context.Documents
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+
+        if (startDoc is null)
+            return [];
+
+        // Collect all documents in this version chain.
+        // Walk up to find the root (oldest version with no parent).
+        var rootId = startDoc.Id;
+        var currentParentId = startDoc.ParentDocumentId;
+        var visited = new HashSet<string> { rootId };
+
+        while (!string.IsNullOrEmpty(currentParentId) && visited.Add(currentParentId))
+        {
+            var parent = await _context.Documents
+                .AsNoTracking()
+                .Select(d => new { d.Id, d.ParentDocumentId })
+                .FirstOrDefaultAsync(d => d.Id == currentParentId, cancellationToken);
+
+            if (parent is null)
+                break;
+
+            rootId = parent.Id;
+            currentParentId = parent.ParentDocumentId;
+        }
+
+        // Now walk down from the root collecting all versions.
+        // Use a single query: all documents in the same project that share the version chain.
+        // Since the chain is linked via ParentDocumentId, we collect iteratively.
+        var chain = new List<DocumentEntity>();
+        var currentId = rootId;
+        var visitedDown = new HashSet<string>();
+
+        while (!string.IsNullOrEmpty(currentId) && visitedDown.Add(currentId))
+        {
+            var doc = await _context.Documents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == currentId, cancellationToken);
+
+            if (doc is null)
+                break;
+
+            chain.Add(doc);
+
+            // Find the child that has this document as parent
+            var child = await _context.Documents
+                .AsNoTracking()
+                .Select(d => new { d.Id, d.ParentDocumentId })
+                .FirstOrDefaultAsync(d => d.ParentDocumentId == currentId, cancellationToken);
+
+            currentId = child?.Id;
+        }
+
+        return chain
+            .OrderByDescending(e => e.VersionNumber)
+            .Select(MapToModel)
+            .ToList();
     }
 
     #endregion
@@ -257,6 +342,9 @@ public sealed class EfCoreDocumentRepository : IDocumentRepository
             Metadata = !string.IsNullOrEmpty(entity.MetadataJson)
                 ? JsonSerializer.Deserialize<Dictionary<string, string>>(entity.MetadataJson)
                 : null,
+            VersionNumber = entity.VersionNumber,
+            ParentDocumentId = entity.ParentDocumentId,
+            IsSuperseded = entity.IsSuperseded,
             CreatedAt = entity.CreatedAt,
             UpdatedAt = entity.UpdatedAt
         };

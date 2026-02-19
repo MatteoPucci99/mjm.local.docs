@@ -1,0 +1,114 @@
+@using MudBlazor
+@using Mjm.LocalDocs.Core.Models
+@using System.ComponentModel.DataAnnotations
+
+<MudDialog>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+            La versione corrente (v@(Document.VersionNumber)) verra' conservata come storico.
+            I risultati di ricerca punteranno alla nuova versione.
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Class="mb-4">
+            <strong>Documento:</strong> @Document.FileName — <strong>Versione corrente:</strong> v@(Document.VersionNumber)
+        </MudText>
+
+        <EditForm Model="@_model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="_model.Title"
+                          Label="Titolo"
+                          Required="true"
+                          Variant="Variant.Outlined"
+                          Class="mb-4"
+                          MaxLength="200"
+                          For="@(() => _model.Title)"
+                          Immediate="true" />
+
+            <MudTextField @bind-Value="_model.Content"
+                          Label="Contenuto"
+                          Required="true"
+                          Variant="Variant.Outlined"
+                          Lines="15"
+                          MaxLength="500000"
+                          For="@(() => _model.Content)"
+                          Class="mb-2"
+                          Immediate="true" />
+
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Supporta formattazione Markdown. La modifica creera' una nuova versione (v@(Document.VersionNumber + 1)).
+            </MudText>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_saving">Annulla</MudButton>
+        <MudButton OnClick="Submit"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!IsValid || _saving)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Aggiorna
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>
+    /// The document being edited (current version).
+    /// </summary>
+    [Parameter]
+    public Document Document { get; set; } = null!;
+
+    private readonly KnowHowModel _model = new();
+    private bool _saving;
+
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(_model.Title) &&
+        !string.IsNullOrWhiteSpace(_model.Content);
+
+    protected override void OnParametersSet()
+    {
+        if (Document is not null)
+        {
+            // Pre-fill with existing data
+            _model.Title = Path.GetFileNameWithoutExtension(Document.FileName);
+            _model.Content = Document.ExtractedText;
+        }
+    }
+
+    private void Submit()
+    {
+        if (!IsValid) return;
+
+        _saving = true;
+        StateHasChanged();
+
+        MudDialog?.Close(DialogResult.Ok(new EditKnowHowResult(
+            _model.Title!.Trim(),
+            _model.Content!.Trim())));
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    /// <summary>
+    /// Result returned when the user confirms the know how update.
+    /// </summary>
+    public sealed record EditKnowHowResult(string Title, string Content);
+
+    private sealed class KnowHowModel
+    {
+        [Required(ErrorMessage = "Il titolo e' obbligatorio")]
+        [MaxLength(200, ErrorMessage = "Il titolo non puo' superare i 200 caratteri")]
+        public string? Title { get; set; }
+
+        [Required(ErrorMessage = "Il contenuto e' obbligatorio")]
+        [MaxLength(500000, ErrorMessage = "Il contenuto e' troppo lungo")]
+        public string? Content { get; set; }
+    }
+}

@@ -74,7 +74,7 @@ public sealed class ProjectTools
             return $"Error: Project '{projectIdOrName}' not found.";
         }
 
-        var documents = await _documentService.GetDocumentsByProjectAsync(project.Id, cancellationToken);
+        var documents = await _documentService.GetDocumentsByProjectAsync(project.Id, cancellationToken: cancellationToken);
 
         var response = $"## Project: {project.Name}\n\n";
         response += $"**ID**: {project.Id}\n";

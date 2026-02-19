@@ -138,6 +138,55 @@ public sealed class DocumentService
     }
 
     /// <summary>
+    /// Updates a document by creating a new version. The previous version is preserved
+    /// as history but its chunks and embeddings are removed from search.
+    /// </summary>
+    /// <param name="existingDocumentId">The ID of the document to supersede.</param>
+    /// <param name="newVersionDocument">The new version document. Must have FileContent set.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The saved new version document.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the existing document is not found or is already superseded.
+    /// </exception>
+    public async Task<Document> UpdateDocumentAsync(
+        string existingDocumentId,
+        Document newVersionDocument,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validate existing document
+        var existing = await _repository.GetDocumentAsync(existingDocumentId, cancellationToken);
+        if (existing is null)
+            throw new InvalidOperationException($"Document '{existingDocumentId}' not found.");
+        if (existing.IsSuperseded)
+            throw new InvalidOperationException($"Document '{existingDocumentId}' is already superseded. Update the latest version instead.");
+
+        // 2. Save the new version (reuses the full AddDocumentAsync pipeline: file storage, chunks, embeddings)
+        var savedDocument = await AddDocumentAsync(newVersionDocument, cancellationToken);
+
+        // 3. Supersede the old document
+        await _repository.SupersedeDocumentAsync(existingDocumentId, cancellationToken);
+
+        // 4. Remove chunks and embeddings from the old document (keep metadata + extracted text)
+        await _vectorStore.DeleteByDocumentIdAsync(existingDocumentId, cancellationToken);
+        await _repository.DeleteChunksByDocumentAsync(existingDocumentId, cancellationToken);
+
+        return savedDocument;
+    }
+
+    /// <summary>
+    /// Gets all versions in a document's version chain.
+    /// </summary>
+    /// <param name="documentId">Any document ID in the version chain.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>All versions ordered by version number descending (newest first).</returns>
+    public Task<IReadOnlyList<Document>> GetDocumentVersionsAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _repository.GetDocumentVersionsAsync(documentId, cancellationToken);
+    }
+
+    /// <summary>
     /// Searches for documents matching the query.
     /// </summary>
     /// <param name="query">The search query.</param>
@@ -176,7 +225,6 @@ public sealed class DocumentService
         var chunkDict = chunks.ToDictionary(c => c.Id);
         var results = vectorResults
             .Where(vr => chunkDict.ContainsKey(vr.ChunkId))
-            .Take(limit)
             .Select(vr => new SearchResult
             {
                 Chunk = chunkDict[vr.ChunkId],
@@ -184,7 +232,23 @@ public sealed class DocumentService
             })
             .ToList();
 
-        return results;
+        // 6. Filter out superseded documents (safety net — normally they have no embeddings)
+        if (results.Count > 0)
+        {
+            var docIds = results.Select(r => r.Chunk.DocumentId).Distinct().ToList();
+            var supersededIds = new HashSet<string>();
+            foreach (var docId in docIds)
+            {
+                var doc = await _repository.GetDocumentAsync(docId, cancellationToken);
+                if (doc?.IsSuperseded == true)
+                    supersededIds.Add(docId);
+            }
+
+            if (supersededIds.Count > 0)
+                results = results.Where(r => !supersededIds.Contains(r.Chunk.DocumentId)).ToList();
+        }
+
+        return results.Take(limit).ToList();
     }
 
     /// <summary>
@@ -261,16 +325,23 @@ public sealed class DocumentService
     }
 
     /// <summary>
-    /// Gets all documents for a project.
+    /// Gets all documents for a project, optionally filtering out superseded versions.
     /// </summary>
     /// <param name="projectId">The project identifier.</param>
+    /// <param name="includeSuperseded">Whether to include superseded document versions. Default is true for backward compatibility.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of documents in the project.</returns>
-    public Task<IReadOnlyList<Document>> GetDocumentsByProjectAsync(
+    public async Task<IReadOnlyList<Document>> GetDocumentsByProjectAsync(
         string projectId,
+        bool includeSuperseded = true,
         CancellationToken cancellationToken = default)
     {
-        return _repository.GetDocumentsByProjectAsync(projectId, cancellationToken);
+        var documents = await _repository.GetDocumentsByProjectAsync(projectId, cancellationToken);
+
+        if (includeSuperseded)
+            return documents;
+
+        return documents.Where(d => !d.IsSuperseded).ToList();
     }
 
     /// <summary>

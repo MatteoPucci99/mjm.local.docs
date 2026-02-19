@@ -100,14 +100,26 @@ public sealed class LocalDocsDbContext : DbContext
             entity.Property(e => e.ContentHash)
                 .HasMaxLength(64); // SHA256 hex string
 
-            entity.Property(e => e.MetadataJson)
-                .HasColumnType("TEXT");
+            entity.Property(e => e.MetadataJson);
+
+            entity.Property(e => e.VersionNumber)
+                .IsRequired()
+                .HasDefaultValue(1);
+
+            entity.Property(e => e.ParentDocumentId)
+                .HasMaxLength(36);
+
+            entity.Property(e => e.IsSuperseded)
+                .IsRequired()
+                .HasDefaultValue(false);
 
             entity.Property(e => e.CreatedAt)
                 .IsRequired();
 
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.ContentHash);
+            entity.HasIndex(e => e.ParentDocumentId);
+            entity.HasIndex(e => e.IsSuperseded);
             entity.HasIndex(e => new { e.ProjectId, e.FileName });
 
             // Cascade delete: when document is deleted, delete all chunks

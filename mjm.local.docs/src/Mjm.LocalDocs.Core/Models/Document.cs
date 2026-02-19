@@ -63,6 +63,22 @@ public sealed class Document
     public Dictionary<string, string>? Metadata { get; init; }
 
     /// <summary>
+    /// Version number for this document. Starts at 1, incremented on each update.
+    /// </summary>
+    public int VersionNumber { get; init; } = 1;
+
+    /// <summary>
+    /// ID of the previous version of this document. Null for the first version.
+    /// </summary>
+    public string? ParentDocumentId { get; init; }
+
+    /// <summary>
+    /// Indicates this document has been replaced by a newer version.
+    /// When true, chunks and embeddings are removed but metadata and extracted text are preserved.
+    /// </summary>
+    public bool IsSuperseded { get; init; }
+
+    /// <summary>
     /// Timestamp when the document was added.
     /// </summary>
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;

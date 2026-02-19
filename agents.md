@@ -173,6 +173,75 @@ Register via extension methods in `DependencyInjection/` folders:
 - `AddLocalDocsInfrastructure()` - configurable via appsettings.json
 - `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, in-memory storage)
 
+### Embedding Providers
+
+| Provider | Description | Default Dimension | Package |
+|----------|-------------|-------------------|---------|
+| Fake | Deterministic pseudo-random (dev/test only) | 1536 | Built-in |
+| OpenAI | OpenAI Embeddings API | 1536 | `Microsoft.Extensions.AI.OpenAI` |
+| AzureOpenAI | Azure OpenAI Service | 1536 | `Azure.AI.OpenAI` (via Semantic Kernel) |
+| Ollama | Local LLM server | 768 (model-dependent) | `Microsoft.Extensions.AI.Ollama` |
+
+**Configuration Examples:**
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "OpenAI",
+      "Dimension": 1536,
+      "OpenAI": {
+        "ApiKey": "sk-...",
+        "Model": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "AzureOpenAI",
+      "Dimension": 1536,
+      "AzureOpenAI": {
+        "Endpoint": "https://your-resource.openai.azure.com/",
+        "ApiKey": "...",
+        "DeploymentName": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+```json
+{
+  "LocalDocs": {
+    "Embeddings": {
+      "Provider": "Ollama",
+      "Dimension": 768,
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "Model": "nomic-embed-text"
+      }
+    }
+  }
+}
+```
+
+**Environment Variables:**
+- `OPENAI_API_KEY` - OpenAI API key (alternative to config)
+- `AZURE_OPENAI_ENDPOINT` - Azure OpenAI endpoint URL
+- `AZURE_OPENAI_API_KEY` - Azure OpenAI API key
+
+**Popular Ollama Embedding Models:**
+| Model | Dimension | Notes |
+|-------|-----------|-------|
+| `nomic-embed-text` | 768 | Good balance of quality and speed |
+| `mxbai-embed-large` | 1024 | Higher quality, slower |
+| `all-minilm` | 384 | Fastest, lower quality |
+
 ### Storage Providers (Metadata & Embeddings)
 
 | Provider | Description | Vector Search |
