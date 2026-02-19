@@ -1,0 +1,98 @@
+@using MudBlazor
+@using Mjm.LocalDocs.Core.Models
+
+<MudDialog>
+    <DialogContent>
+        @if (Versions is null || Versions.Count == 0)
+        {
+            <MudText Typo="Typo.body1">Nessuna versione trovata.</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Striped="true" Style="overflow-x: auto;">
+                <thead>
+                    <tr>
+                        <th>Versione</th>
+                        <th>Nome File</th>
+                        <th>Tipo</th>
+                        <th>Dimensione</th>
+                        <th>Data</th>
+                        <th>Stato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var version in Versions)
+                    {
+                        <tr style="@GetRowStyle(version)">
+                            <td>
+                                <MudChip T="string"
+                                         Size="Size.Small"
+                                         Color="@(version.Id == CurrentDocumentId ? Color.Primary : Color.Default)"
+                                         Variant="@(version.Id == CurrentDocumentId ? Variant.Filled : Variant.Outlined)">
+                                    v@(version.VersionNumber)
+                                </MudChip>
+                            </td>
+                            <td>@version.FileName</td>
+                            <td>@version.FileExtension</td>
+                            <td>@FormatFileSize(version.FileSizeBytes)</td>
+                            <td>@version.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                @if (version.IsSuperseded)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                                        Sostituito
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+                                        Corrente
+                                    </MudChip>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Text">Chiudi</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<Document>? Versions { get; set; }
+
+    [Parameter]
+    public string CurrentDocumentId { get; set; } = string.Empty;
+
+    private void Close() => MudDialog?.Close();
+
+    private string GetRowStyle(Document version)
+    {
+        if (version.Id == CurrentDocumentId)
+            return "background-color: var(--mud-palette-primary-lighten); font-weight: 600;";
+
+        return version.IsSuperseded ? "opacity: 0.55;" : string.Empty;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB"];
+        int order = 0;
+        double size = bytes;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+
+        return $"{size:0.##} {sizes[order]}";
+    }
+}
