@@ -9,7 +9,7 @@ Built with .NET 10, SQLite, and Blazor Server.
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-username/mjm.local.docs
+git clone https://github.com/markjackmilian/mjm.local.docs
 cd mjm.local.docs/mjm.local.docs
 dotnet run --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj
 ```
