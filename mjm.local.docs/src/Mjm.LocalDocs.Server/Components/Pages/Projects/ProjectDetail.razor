@@ -17,7 +17,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 
-<PageTitle>@(_project?.Name ?? "Progetto") - Local Docs</PageTitle>
+<PageTitle>@(_project?.Name ?? "Project") - Local Docs</PageTitle>
 
 @if (_loading)
 {
@@ -25,9 +25,9 @@
 }
 else if (_project is null)
 {
-    <MudAlert Severity="Severity.Error">Progetto non trovato.</MudAlert>
+    <MudAlert Severity="Severity.Error">Project not found.</MudAlert>
     <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-4" OnClick="@(() => Navigation.NavigateTo("/projects"))">
-        Torna alla lista progetti
+        Back to projects list
     </MudButton>
 }
 else
@@ -40,7 +40,7 @@ else
                    Color="Color.Error" 
                    StartIcon="@Icons.Material.Filled.Delete"
                    OnClick="DeleteProjectAsync">
-            Elimina Progetto
+            Delete Project
         </MudButton>
     </div>
 
@@ -48,13 +48,13 @@ else
         @* Project Info Section *@
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">Informazioni Progetto</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4">Project Info</MudText>
                 
                 <EditForm Model="@_editModel" OnValidSubmit="SaveProjectAsync">
                     <DataAnnotationsValidator />
                     
                     <MudTextField @bind-Value="_editModel.Name"
-                                  Label="Nome"
+                                  Label="Name"
                                   Required="true"
                                   Variant="Variant.Outlined"
                                   Class="mb-4"
@@ -63,18 +63,18 @@ else
                                   ErrorText="@_nameError" />
                     
                     <MudTextField @bind-Value="_editModel.Description"
-                                  Label="Descrizione"
+                                  Label="Description"
                                   Variant="Variant.Outlined"
                                   Class="mb-4"
                                   Lines="3"
                                   MaxLength="500" />
                     
                     <MudText Typo="Typo.caption" Class="mud-text-secondary mb-4 d-block">
-                        Creato: @_project.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")
+                        Created: @_project.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")
                         @if (_project.UpdatedAt.HasValue)
                         {
                             <br />
-                            <span>Modificato: @_project.UpdatedAt.Value.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</span>
+                            <span>Updated: @_project.UpdatedAt.Value.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</span>
                         }
                     </MudText>
                     
@@ -87,7 +87,7 @@ else
                         {
                             <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                         }
-                        Salva Modifiche
+                        Save Changes
                     </MudButton>
                 </EditForm>
             </MudPaper>
@@ -98,18 +98,18 @@ else
             <MudPaper Class="pa-4" Elevation="2">
                 <div class="d-flex justify-space-between align-center mb-4">
                     <MudText Typo="Typo.h6">
-                        Documenti (@ActiveDocumentCount)
+                        Documents (@ActiveDocumentCount)
                         @if (SupersededDocumentCount > 0)
                         {
                             <MudText Typo="Typo.caption" Class="ml-2 mud-text-secondary" Style="display: inline;">
-                                + @SupersededDocumentCount versioni precedenti
+                                + @SupersededDocumentCount previous versions
                             </MudText>
                         }
                     </MudText>
                     @if (SupersededDocumentCount > 0)
                     {
                         <MudSwitch @bind-Value="_showSuperseded" 
-                                   Label="Mostra versioni precedenti" 
+                                   Label="Show previous versions" 
                                    Color="Color.Primary"
                                    Size="Size.Small" />
                     }
@@ -132,13 +132,13 @@ else
                             @if (_uploading)
                             {
                                 <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
-                                <MudText Typo="Typo.body2" Class="mt-2">Caricamento in corso...</MudText>
+                                <MudText Typo="Typo.body2" Class="mt-2">Uploading...</MudText>
                             }
                             else
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
                                 <MudText Typo="Typo.body1" Class="mt-2">
-                                    Trascina i file qui o clicca per selezionare
+                                    Drag files here or click to select
                                 </MudText>
                                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
                                     Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
@@ -153,10 +153,10 @@ else
                                   @onclick="AddKnowHowAsync">
                             <MudIcon Icon="@Icons.Material.Filled.NoteAdd" Size="Size.Large" Color="Color.Secondary" />
                             <MudText Typo="Typo.body1" Class="mt-2">
-                                Aggiungi Know How
+                                Add Know How
                             </MudText>
                             <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                                Scrivi un documento direttamente dalla UI
+                                Write a document directly from the UI
                             </MudText>
                         </MudPaper>
                     </MudItem>
@@ -164,7 +164,7 @@ else
 
                 @* Search and Filter *@
                 <MudTextField @bind-Value="_searchText"
-                              Placeholder="Cerca documenti..."
+                              Placeholder="Search documents..."
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               Immediate="true"
@@ -178,7 +178,7 @@ else
                 @if (_documents.Count == 0)
                 {
                     <MudAlert Severity="Severity.Info">
-                        Nessun documento caricato. Usa l'area sopra per caricare i tuoi documenti.
+                        No documents uploaded. Use the area above to upload your documents.
                     </MudAlert>
                 }
                 else
@@ -193,7 +193,7 @@ else
                                  Hover="true"
                                  RowStyleFunc="@GetRowStyle">
                         <Columns>
-                            <PropertyColumn Property="x => x.FileName" Title="Nome File" Sortable="true">
+                            <PropertyColumn Property="x => x.FileName" Title="File Name" Sortable="true">
                                 <CellTemplate>
                                     <div class="d-flex align-center">
                                         <MudIcon Icon="@GetFileIcon(context.Item.FileExtension)" 
@@ -206,7 +206,7 @@ else
                                     </div>
                                 </CellTemplate>
                             </PropertyColumn>
-                            <PropertyColumn Property="x => x.VersionNumber" Title="Versione" Sortable="true">
+                            <PropertyColumn Property="x => x.VersionNumber" Title="Version" Sortable="true">
                                 <CellTemplate>
                                     <MudChip T="string"
                                              Size="Size.Small"
@@ -217,28 +217,28 @@ else
                                     @if (context.Item.IsSuperseded)
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled" Class="ml-1">
-                                            Sostituito
+                                            Superseded
                                         </MudChip>
                                     }
                                 </CellTemplate>
                             </PropertyColumn>
-                            <PropertyColumn Property="x => x.FileExtension" Title="Tipo" Sortable="true" />
-                            <PropertyColumn Property="x => x.FileSizeBytes" Title="Dimensione" Sortable="true">
+                            <PropertyColumn Property="x => x.FileExtension" Title="Type" Sortable="true" />
+                            <PropertyColumn Property="x => x.FileSizeBytes" Title="Size" Sortable="true">
                                 <CellTemplate>
                                     @FormatFileSize(context.Item.FileSizeBytes)
                                 </CellTemplate>
                             </PropertyColumn>
-                            <PropertyColumn Property="x => x.CreatedAt" Title="Data" Sortable="true">
+                            <PropertyColumn Property="x => x.CreatedAt" Title="Date" Sortable="true">
                                 <CellTemplate>
                                     @context.Item.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")
                                 </CellTemplate>
                             </PropertyColumn>
-                            <TemplateColumn Title="Azioni" Sortable="false">
+                            <TemplateColumn Title="Actions" Sortable="false">
                                 <CellTemplate>
                                     @if (context.Item.VersionNumber > 1 || context.Item.ParentDocumentId is not null 
                                          || _documents.Any(d => d.ParentDocumentId == context.Item.Id))
                                     {
-                                        <MudTooltip Text="Cronologia versioni">
+                                        <MudTooltip Text="Version history">
                                             <MudIconButton Icon="@Icons.Material.Filled.History"
                                                            Size="Size.Small"
                                                            Color="Color.Info"
@@ -249,27 +249,27 @@ else
                                     {
                                         @if (IsTextDocument(context.Item.FileExtension))
                                         {
-                                            <MudTooltip Text="Modifica know how">
+                                            <MudTooltip Text="Edit know how">
                                                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                                Size="Size.Small"
                                                                Color="Color.Warning"
                                                                OnClick="@(() => EditKnowHowAsync(context.Item))" />
                                             </MudTooltip>
                                         }
-                                        <MudTooltip Text="Carica nuova versione">
+                                        <MudTooltip Text="Upload new version">
                                             <MudIconButton Icon="@Icons.Material.Filled.UploadFile"
                                                            Size="Size.Small"
                                                            Color="Color.Tertiary"
                                                            OnClick="@(() => UpdateDocumentAsync(context.Item))" />
                                         </MudTooltip>
                                     }
-                                    <MudTooltip Text="Scarica">
+                                    <MudTooltip Text="Download">
                                         <MudIconButton Icon="@Icons.Material.Filled.Download"
                                                        Size="Size.Small"
                                                        Color="Color.Primary"
                                                        OnClick="@(() => DownloadDocumentAsync(context.Item))" />
                                     </MudTooltip>
-                                    <MudTooltip Text="Elimina">
+                                    <MudTooltip Text="Delete">
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                        Size="Size.Small"
                                                        Color="Color.Error"
@@ -345,7 +345,7 @@ else
             _breadcrumbs =
             [
                 new("Dashboard", href: "/", icon: Icons.Material.Filled.Home),
-                new("Progetti", href: "/projects", icon: Icons.Material.Filled.Folder),
+                new("Projects", href: "/projects", icon: Icons.Material.Filled.Folder),
                 new(_project.Name, href: null, disabled: true)
             ];
             
@@ -363,7 +363,7 @@ else
         
         if (string.IsNullOrWhiteSpace(_editModel.Name))
         {
-            _nameError = "Il nome del progetto e' obbligatorio";
+            _nameError = "Project name is required";
             return;
         }
 
@@ -371,7 +371,7 @@ else
         if (_editModel.Name.Trim() != _project.Name && 
             await ProjectRepository.ExistsByNameAsync(_editModel.Name.Trim()))
         {
-            _nameError = "Esiste gia' un progetto con questo nome";
+            _nameError = "A project with this name already exists";
             return;
         }
 
@@ -392,11 +392,11 @@ else
             _project = await ProjectRepository.UpdateAsync(updatedProject);
             _breadcrumbs[2] = new(_project.Name, href: null, disabled: true);
             
-            Snackbar.Add("Progetto aggiornato con successo!", Severity.Success);
+            Snackbar.Add("Project updated successfully!", Severity.Success);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Errore durante il salvataggio: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -410,13 +410,13 @@ else
 
         var parameters = new DialogParameters<ConfirmDialog>
         {
-            { x => x.ContentText, $"Sei sicuro di voler eliminare il progetto \"{_project.Name}\"? Verranno eliminati anche tutti i {_documents.Count} documenti e i dati associati." },
-            { x => x.ButtonText, "Elimina" },
+            { x => x.ContentText, $"Are you sure you want to delete project \"{_project.Name}\"? All {_documents.Count} documents and associated data will also be deleted." },
+            { x => x.ButtonText, "Delete" },
             { x => x.Color, Color.Error }
         };
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Conferma Eliminazione", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Deletion", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -424,12 +424,12 @@ else
             var deleted = await ProjectRepository.DeleteAsync(_project.Id);
             if (deleted)
             {
-                Snackbar.Add($"Progetto \"{_project.Name}\" eliminato con successo.", Severity.Success);
+                Snackbar.Add($"Project \"{_project.Name}\" deleted successfully.", Severity.Success);
                 Navigation.NavigateTo("/projects");
             }
             else
             {
-                Snackbar.Add("Errore durante l'eliminazione del progetto.", Severity.Error);
+                Snackbar.Add("Error deleting project.", Severity.Error);
             }
         }
     }
@@ -467,13 +467,13 @@ else
                     var extractionResult = await DocumentReader.ExtractTextAsync(fileContent, fileExtension);
                     if (!extractionResult.Success)
                     {
-                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Estrazione testo fallita");
+                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Text extraction failed");
                     }
                     extractedText = extractionResult.Text;
                 }
                 else
                 {
-                    // Fallback per formati testuali non gestiti dal CompositeDocumentReader
+                    // Fallback for text formats not handled by CompositeDocumentReader
                     extractedText = Encoding.UTF8.GetString(fileContent);
                 }
                 
@@ -498,7 +498,7 @@ else
             catch (Exception ex)
             {
                 errorCount++;
-                Snackbar.Add($"Errore caricamento \"{file.Name}\": {ex.Message}", Severity.Error);
+                Snackbar.Add($"Upload error \"{file.Name}\": {ex.Message}", Severity.Error);
             }
         }
 
@@ -510,7 +510,7 @@ else
 
         if (successCount > 0)
         {
-            Snackbar.Add($"{successCount} documento/i caricato/i con successo!", Severity.Success);
+            Snackbar.Add($"{successCount} document(s) uploaded successfully!", Severity.Success);
         }
     }
 
@@ -527,7 +527,7 @@ else
             var fileContent = await DocumentService.GetDocumentFileAsync(document.Id);
             if (fileContent is null)
             {
-                Snackbar.Add("File non trovato.", Severity.Error);
+                Snackbar.Add("File not found.", Severity.Error);
                 return;
             }
 
@@ -538,7 +538,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Errore durante il download: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Download error: {ex.Message}", Severity.Error);
         }
     }
 
@@ -546,13 +546,13 @@ else
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
-            { x => x.ContentText, $"Sei sicuro di voler eliminare il documento \"{document.FileName}\"? Verranno eliminati anche tutti i dati vettoriali associati." },
-            { x => x.ButtonText, "Elimina" },
+            { x => x.ContentText, $"Are you sure you want to delete document \"{document.FileName}\"? All associated vector data will also be deleted." },
+            { x => x.ButtonText, "Delete" },
             { x => x.Color, Color.Error }
         };
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Conferma Eliminazione", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Deletion", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -561,12 +561,12 @@ else
             if (deleted)
             {
                 _documents.Remove(document);
-                Snackbar.Add($"Documento \"{document.FileName}\" eliminato con successo.", Severity.Success);
+                Snackbar.Add($"Document \"{document.FileName}\" deleted successfully.", Severity.Success);
                 StateHasChanged();
             }
             else
             {
-                Snackbar.Add("Errore durante l'eliminazione del documento.", Severity.Error);
+                Snackbar.Add("Error deleting document.", Severity.Error);
             }
         }
     }
@@ -588,7 +588,7 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<UpdateDocumentDialog>(
-            "Aggiorna Documento", parameters, options);
+            "Update Document", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false, Data: UpdateDocumentDialog.UpdateDocumentResult uploadResult })
@@ -604,7 +604,7 @@ else
                     var extractionResult = await DocumentReader.ExtractTextAsync(uploadResult.FileContent, fileExtension);
                     if (!extractionResult.Success)
                     {
-                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Estrazione testo fallita");
+                        throw new InvalidOperationException(extractionResult.ErrorMessage ?? "Text extraction failed");
                     }
                     extractedText = extractionResult.Text;
                 }
@@ -635,11 +635,11 @@ else
                 _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
                 StateHasChanged();
 
-                Snackbar.Add($"Documento \"{uploadResult.FileName}\" aggiornato a v{newVersionDocument.VersionNumber}!", Severity.Success);
+                Snackbar.Add($"Document \"{uploadResult.FileName}\" updated to v{newVersionDocument.VersionNumber}!", Severity.Success);
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Errore durante l'aggiornamento: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Update error: {ex.Message}", Severity.Error);
             }
         }
     }
@@ -667,7 +667,7 @@ else
         };
         
         await DialogService.ShowAsync<DocumentVersionHistoryDialog>(
-            "Cronologia Versioni", parameters, options);
+            "Version History", parameters, options);
     }
 
     private async Task AddKnowHowAsync()
@@ -682,7 +682,7 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<AddKnowHowDialog>(
-            "Aggiungi Know How", options);
+            "Add Know How", options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false, Data: AddKnowHowDialog.AddKnowHowResult knowHowResult })
@@ -711,11 +711,11 @@ else
                 _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
                 StateHasChanged();
 
-                Snackbar.Add($"Know how \"{knowHowResult.Title}\" creato con successo!", Severity.Success);
+                Snackbar.Add($"Know how \"{knowHowResult.Title}\" created successfully!", Severity.Success);
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Errore durante la creazione del know how: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Error creating know how: {ex.Message}", Severity.Error);
             }
         }
     }
@@ -737,7 +737,7 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<EditKnowHowDialog>(
-            "Modifica Know How", parameters, options);
+            "Edit Know How", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false, Data: EditKnowHowDialog.EditKnowHowResult editResult })
@@ -768,11 +768,11 @@ else
                 _documents = (await DocumentService.GetDocumentsByProjectAsync(ProjectId)).ToList();
                 StateHasChanged();
 
-                Snackbar.Add($"Know how \"{editResult.Title}\" aggiornato a v{newVersionDocument.VersionNumber}!", Severity.Success);
+                Snackbar.Add($"Know how \"{editResult.Title}\" updated to v{newVersionDocument.VersionNumber}!", Severity.Success);
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Errore durante l'aggiornamento del know how: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Error updating know how: {ex.Message}", Severity.Error);
             }
         }
     }
@@ -869,11 +869,11 @@ else
 
     private sealed class ProjectEditModel
     {
-        [Required(ErrorMessage = "Il nome del progetto e' obbligatorio")]
-        [MaxLength(100, ErrorMessage = "Il nome non puo' superare i 100 caratteri")]
+        [Required(ErrorMessage = "Project name is required")]
+        [MaxLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
         public string Name { get; set; } = string.Empty;
 
-        [MaxLength(500, ErrorMessage = "La descrizione non puo' superare i 500 caratteri")]
+        [MaxLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
         public string? Description { get; set; }
     }
 }

@@ -5,15 +5,15 @@
 <MudDialog>
     <DialogContent>
         <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
-            La versione corrente (v@(Document.VersionNumber)) verra' conservata come storico.
-            I risultati di ricerca punteranno alla nuova versione.
+            The current version (v@(Document.VersionNumber)) will be preserved as history.
+            Search results will point to the new version.
         </MudAlert>
 
         <MudText Typo="Typo.body2" Class="mb-2">
-            <strong>Documento:</strong> @Document.FileName
+            <strong>Document:</strong> @Document.FileName
         </MudText>
         <MudText Typo="Typo.body2" Class="mb-4">
-            <strong>Versione corrente:</strong> v@(Document.VersionNumber)
+            <strong>Current version:</strong> v@(Document.VersionNumber)
         </MudText>
 
         <MudPaper Outlined="true"
@@ -30,14 +30,14 @@
                     <strong>@_selectedFile.Name</strong> (@FormatFileSize(_selectedFile.Size))
                 </MudText>
                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                    Clicca per cambiare file
+                    Click to change file
                 </MudText>
             }
             else
             {
                 <MudIcon Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Size="Size.Large" />
                 <MudText Typo="Typo.body2" Class="mt-2">
-                    Seleziona il file della nuova versione
+                    Select the file for the new version
                 </MudText>
                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
                     Formati supportati: .txt, .md, .pdf, .docx, .html, .json, .xml, .csv
@@ -51,7 +51,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_uploading">Annulla</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_uploading">Cancel</MudButton>
         <MudButton OnClick="Submit"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -60,7 +60,7 @@
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
             }
-            Aggiorna
+            Update
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -86,7 +86,7 @@
 
         if (file.Size > 50 * 1024 * 1024)
         {
-            _error = "Il file supera il limite di 50 MB.";
+            _error = "The file exceeds the 50 MB limit.";
             _selectedFile = null;
             return;
         }
@@ -116,7 +116,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Errore durante la lettura del file: {ex.Message}";
+            _error = $"Error reading file: {ex.Message}";
             _uploading = false;
             StateHasChanged();
         }

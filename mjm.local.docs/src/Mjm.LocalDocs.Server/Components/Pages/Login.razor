@@ -12,11 +12,11 @@
             <MudIcon Icon="@Icons.Material.Filled.Description" 
                      Style="font-size: 4rem; color: white; margin-bottom: 1.5rem;" />
             <MudText Typo="Typo.h3" Style="color: white; font-weight: 600; margin-bottom: 1rem;">
-                Benvenuto in Local Docs
+                Welcome to Local Docs
             </MudText>
             <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.85); max-width: 400px; line-height: 1.6;">
-                La tua piattaforma per la gestione e ricerca semantica di documenti. 
-                Organizza, indicizza e trova i tuoi documenti con la potenza dell'intelligenza artificiale.
+                Your platform for document management and semantic search. 
+                Organize, index, and find your documents with the power of artificial intelligence.
             </MudText>
         </div>
         
@@ -39,7 +39,7 @@
             @if (_showError)
             {
                 <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _showError = false)">
-                    Credenziali non valide. Riprova.
+                    Invalid credentials. Please try again.
                 </MudAlert>
             }
 
@@ -49,7 +49,7 @@
                               Variant="Variant.Outlined"
                               InputType="InputType.Text"
                               Required="true"
-                              RequiredError="Username richiesto"
+                              RequiredError="Username is required"
                               Class="mb-4"
                               name="username"
                               Immediate="true"
@@ -61,7 +61,7 @@
                               Variant="Variant.Outlined"
                               InputType="@(_showPassword ? InputType.Text : InputType.Password)"
                               Required="true"
-                              RequiredError="Password richiesta"
+                              RequiredError="Password is required"
                               Class="mb-4"
                               name="password"
                               Immediate="true"
@@ -71,14 +71,14 @@
 
                 <div class="d-flex justify-space-between align-center mb-4">
                     <MudCheckBox @bind-Value="_rememberMe" 
-                                 Label="Ricordami" 
+                                 Label="Remember me" 
                                  Color="Color.Primary"
                                  Size="Size.Small" />
                     <MudButton Variant="Variant.Text" 
                                Size="Size.Small" 
                                Color="Color.Primary"
                                OnClick="@(() => _showPassword = !_showPassword)">
-                        @(_showPassword ? "Nascondi password" : "Mostra password")
+                        @(_showPassword ? "Hide password" : "Show password")
                     </MudButton>
                 </div>
                 <input type="hidden" name="rememberMe" value="@(_rememberMe ? "true" : "false")" />
