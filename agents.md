@@ -6,41 +6,38 @@ Local MCP Server for semantic document search via embeddings. Built with .NET 10
 
 | Item | Value |
 |------|-------|
-| SDK | .NET 10.0.102 |
+| SDK | .NET 10.0.102 (pinned via `global.json`, `rollForward: latestMinor`) |
 | Solution | `mjm.local.docs/mjm.local.docs.sln` |
 | Test Framework | xUnit 2.9.3 + NSubstitute 5.3.0 |
-| MCP Endpoint | `/mcp` |
-| Dev URL | `http://localhost:5024` |
+| MCP Endpoint | `http://localhost:5024/mcp` |
 
-## Build Commands
+## Build & Run Commands
+
+All commands run from the `mjm.local.docs/` directory.
 
 ```bash
-cd mjm.local.docs
-
-dotnet restore                 # Restore dependencies
-dotnet build                   # Build all projects
-dotnet run --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj   # Run server
-dotnet watch --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj # Hot reload
+dotnet restore
+dotnet build
+dotnet run --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj
+dotnet watch --project src/Mjm.LocalDocs.Server/Mjm.LocalDocs.Server.csproj
 ```
 
 ## Test Commands
 
 ```bash
-cd mjm.local.docs
-
 # Run all tests
 dotnet test
 
-# Run single test by method name
+# Run a single test by method name (fastest for iteration)
 dotnet test --filter "FullyQualifiedName~SearchAsync_WithNoVectorResults_ReturnsEmptyList"
 
 # Run all tests in a class
 dotnet test --filter "FullyQualifiedName~DocumentServiceTests"
 
-# Run tests with verbose output
+# Verbose output
 dotnet test --logger "console;verbosity=detailed"
 
-# Run tests with coverage
+# Code coverage
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
@@ -48,30 +45,50 @@ dotnet test --collect:"XPlat Code Coverage"
 
 ```
 mjm.local.docs/
-├── mjm.local.docs.sln
-├── global.json                       # SDK version pinned to 10.0.102
 ├── src/
-│   ├── Mjm.LocalDocs.Core/           # Abstractions, models (no external deps)
-│   │   ├── Abstractions/             # IDocumentRepository, IVectorStore, etc.
-│   │   ├── Models/                   # Document, DocumentChunk, SearchResult
-│   │   └── Services/                 # DocumentService
-│   ├── Mjm.LocalDocs.Infrastructure/ # Implementations (embeddings, vector store)
-│   │   ├── Documents/                # PDF, Word, PlainText readers
-│   │   ├── Embeddings/               # Fake and SemanticKernel implementations
-│   │   └── Persistence/              # SQLite repositories
-│   └── Mjm.LocalDocs.Server/         # MCP Server + Blazor Web App
-│       └── McpTools/                 # MCP tool classes
+│   ├── Mjm.LocalDocs.Core/           # Domain models, interfaces — no external deps
+│   │   ├── Abstractions/             # IDocumentRepository, IVectorStore, IEmbeddingService, etc.
+│   │   ├── Configuration/            # LocalDocsOptions and nested config classes/enums
+│   │   ├── Models/                   # Document, DocumentChunk, Project, SearchResult
+│   │   └── Services/                 # DocumentService, ApiTokenService
+│   ├── Mjm.LocalDocs.Infrastructure/ # Implementations of Core interfaces
+│   │   ├── Documents/                # PDF, Word, Markdown, PlainText readers
+│   │   ├── Embeddings/               # FakeEmbeddingService, SemanticKernelEmbeddingService
+│   │   ├── FileStorage/              # Database, FileSystem, AzureBlob providers
+│   │   └── Persistence/              # EF Core DbContext, SQLite/SQL Server repos, vector stores
+│   └── Mjm.LocalDocs.Server/         # Composition root: ASP.NET Core, Blazor, MCP tools
+│       └── McpTools/                 # One class per MCP tool group
 └── tests/
-    └── Mjm.LocalDocs.Tests/          # xUnit tests
+    └── Mjm.LocalDocs.Tests/          # xUnit unit tests (mirrors src structure)
 ```
+
+## Architecture Constraints
+
+- **Core** must have zero external package dependencies — only `Microsoft.Extensions.*` abstractions.
+- **Infrastructure** implements Core interfaces; never reference Server.
+- **Tests** reference Core and Infrastructure only (never Server).
+- **Clean Architecture**: domain rules live in Core.Services, not in Infrastructure or MCP tools.
+- Chunk IDs use the format `{documentId}_chunk_{index}` — required for prefix-based deletion.
+- Vector embeddings are stored separately from chunk metadata (`IVectorStore` vs `IDocumentRepository`).
+
+## Dependency Injection
+
+Register via extension methods in each project's `DependencyInjection/` folder:
+
+```csharp
+AddLocalDocsCoreServices()          // Core services (Scoped)
+AddLocalDocsInfrastructure()        // Reads appsettings.json; dispatches to storage/embedding config
+AddLocalDocsFakeInfrastructure()    // Dev/test: fake embeddings + in-memory storage
+AddLocalDocsSqliteInfrastructure()  // Sqlite with brute-force vector search
+```
+
+Lifetimes: `Scoped` for services and EF repositories; `Singleton` for vector store, embedding service, document readers, and file storage. Use `AddPooledDbContextFactory<>` when both a scoped `DbContext` and singleton `IDbContextFactory` are needed.
 
 ## Code Style
 
 ### Namespaces and Imports
 
-- **File-scoped namespaces** (single line with semicolon)
-- `ImplicitUsings` enabled - common System namespaces auto-imported
-- Order: System > third-party > project namespaces
+File-scoped namespaces throughout. `ImplicitUsings` is enabled (System.* are implicit). Import order: `System.*` → third-party (alphabetical) → `Mjm.LocalDocs.*`.
 
 ```csharp
 using System.ComponentModel;
@@ -87,17 +104,20 @@ namespace Mjm.LocalDocs.Server.McpTools;
 |---------|------------|---------|
 | Interfaces | `I` prefix | `IDocumentRepository` |
 | Async methods | `Async` suffix | `SearchAsync` |
-| Private fields | `_camelCase` | `_repository` |
-| Parameters | `camelCase` | `queryEmbedding` |
-| Properties | `PascalCase` | `DocumentId` |
-| Test methods | `MethodName_Scenario_ExpectedResult` | `SearchAsync_WithNoResults_ReturnsEmptyList` |
+| Private fields | `_camelCase` | `_repository`, `_sut` |
+| Parameters / locals | `camelCase` | `queryEmbedding` |
+| Properties / types | `PascalCase` | `DocumentId`, `DocumentChunk` |
+| Config section constant | `const string SectionName` | `"LocalDocs"` |
+| Test SUT variable | `_sut` | |
+| Test helper methods | `CreateTest{Entity}()` | `CreateTestDocument()` |
+| Test methods | `Method_Scenario_Expected` | `SearchAsync_WithNoResults_ReturnsEmptyList` |
 
 ### Classes and Types
 
-- Use `sealed` on implementation classes
-- Use `required` on required init-only properties
-- Prefer `init` over `set` for immutable models
-- Use primary constructors or traditional constructors for DI
+- Mark all implementation classes `sealed`.
+- Use `required` + `init` for immutable domain model properties; use `get; set;` only on EF entities.
+- Prefer traditional constructors for DI; primary constructors are acceptable for simple cases.
+- EF entities live in `Persistence/Entities/` and are mapped to domain models via private `MapToModel()` methods — no AutoMapper.
 
 ```csharp
 public sealed class DocumentChunk
@@ -109,228 +129,37 @@ public sealed class DocumentChunk
 }
 ```
 
-### Async/Await
+### Async / Await
 
-- All async methods must have `Async` suffix
-- Always accept `CancellationToken cancellationToken = default` as last parameter
-- Never use `.Result` or `.Wait()` - always await
+- Every async method has the `Async` suffix.
+- Last parameter is always `CancellationToken cancellationToken = default`.
+- Never use `.Result` or `.Wait()` — always `await`.
+
+### Error Handling
+
+- Throw `ArgumentException` (with `nameof(param)`) for invalid inputs.
+- Throw `InvalidOperationException` for domain rule violations.
+- Return `null` or `false` for "not found" — do not throw.
+- Return early with `[]` for empty collections: `if (chunks.Count == 0) return [];`
+- In MCP tool methods, catch exceptions and return `"Error: {ex.Message}"` as a string — do not let exceptions propagate.
+
+### Collections and Nullability
+
+- Return type: `IReadOnlyList<T>` from service/repository methods.
+- Input type: `IEnumerable<T>` for collection parameters.
+- Empty collections: `[]` (collection expression), not `new List<T>()`.
+- `Nullable` is enabled everywhere. Use `?`, guard with `string.IsNullOrEmpty()`, pattern-match with `if (x is null)`.
+- Use `!` (null-forgiving) only when genuinely certain — never to silence warnings.
+- EF read-only queries must use `.AsNoTracking()`.
 
 ### XML Documentation
 
-- Document all public types, methods, and properties
-- Use `<inheritdoc />` for interface implementations
+- Document every public type, method, and property.
+- Use `/// <inheritdoc />` (self-closing) on interface implementations.
+- Summaries use imperative form: "Gets a document", not "This method gets a document".
+- Nullable returns: explicitly state "or `null` if not found."
 
-### Nullable Reference Types
-
-- `Nullable` enabled project-wide
-- Use `?` for nullable: `string? collection = null`
-- Check with `string.IsNullOrEmpty()`
-- Use `!` sparingly and only when certain
-
-### Collections and Error Handling
-
-- Return `IReadOnlyList<T>` for read-only collections
-- Use `IEnumerable<T>` for input parameters
-- Use collection expressions: `[]` instead of `new List<T>()`
-- Return early for edge cases: `if (chunks.Count == 0) return [];`
-
-### Test Patterns
-
-- Use `#region` blocks to group related tests by method
-- Create helper methods: `CreateTestDocument()`, `CreateTestChunk()`
-- Use Arrange-Act-Assert pattern with comments
-- Name SUT variable `_sut` (System Under Test)
-- Mock dependencies with `Substitute.For<T>()`
-
-```csharp
-[Fact]
-public async Task SearchAsync_WithNoResults_ReturnsEmptyList()
-{
-    // Arrange
-    _vectorStore.SearchAsync(Arg.Any<ReadOnlyMemory<float>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-        .Returns(new List<VectorSearchResult>());
-
-    // Act
-    var results = await _sut.SearchAsync("query");
-
-    // Assert
-    Assert.Empty(results);
-}
-```
-
-## Architecture
-
-### Clean Architecture Layers
-
-1. **Core** - Domain models, interfaces (no external dependencies)
-2. **Infrastructure** - Implementations of Core interfaces
-3. **Server** - Composition root, MCP tools, Web UI
-
-### Dependency Injection
-
-Register via extension methods in `DependencyInjection/` folders:
-- `AddLocalDocsCoreServices()` - core services
-- `AddLocalDocsInfrastructure()` - configurable via appsettings.json
-- `AddLocalDocsFakeInfrastructure()` - development (fake embeddings, in-memory storage)
-
-### Embedding Providers
-
-| Provider | Description | Default Dimension | Package |
-|----------|-------------|-------------------|---------|
-| Fake | Deterministic pseudo-random (dev/test only) | 1536 | Built-in |
-| OpenAI | OpenAI Embeddings API | 1536 | `Microsoft.Extensions.AI.OpenAI` |
-| AzureOpenAI | Azure OpenAI Service | 1536 | `Azure.AI.OpenAI` (via Semantic Kernel) |
-| Ollama | Local LLM server | 768 (model-dependent) | `Microsoft.Extensions.AI.Ollama` |
-
-**Configuration Examples:**
-
-```json
-{
-  "LocalDocs": {
-    "Embeddings": {
-      "Provider": "OpenAI",
-      "Dimension": 1536,
-      "OpenAI": {
-        "ApiKey": "sk-...",
-        "Model": "text-embedding-3-small"
-      }
-    }
-  }
-}
-```
-
-```json
-{
-  "LocalDocs": {
-    "Embeddings": {
-      "Provider": "AzureOpenAI",
-      "Dimension": 1536,
-      "AzureOpenAI": {
-        "Endpoint": "https://your-resource.openai.azure.com/",
-        "ApiKey": "...",
-        "DeploymentName": "text-embedding-3-small"
-      }
-    }
-  }
-}
-```
-
-```json
-{
-  "LocalDocs": {
-    "Embeddings": {
-      "Provider": "Ollama",
-      "Dimension": 768,
-      "Ollama": {
-        "Endpoint": "http://localhost:11434",
-        "Model": "nomic-embed-text"
-      }
-    }
-  }
-}
-```
-
-**Environment Variables:**
-- `OPENAI_API_KEY` - OpenAI API key (alternative to config)
-- `AZURE_OPENAI_ENDPOINT` - Azure OpenAI endpoint URL
-- `AZURE_OPENAI_API_KEY` - Azure OpenAI API key
-
-**Popular Ollama Embedding Models:**
-| Model | Dimension | Notes |
-|-------|-----------|-------|
-| `nomic-embed-text` | 768 | Good balance of quality and speed |
-| `mxbai-embed-large` | 1024 | Higher quality, slower |
-| `all-minilm` | 384 | Fastest, lower quality |
-
-### Storage Providers (Metadata & Embeddings)
-
-| Provider | Description | Vector Search |
-|-----------|-------------|---------------|
-| InMemory | In-memory only (no persistence) | Brute-force O(n) |
-| Sqlite | SQLite database | Brute-force O(n) |
-| SqliteHnsw | SQLite + HNSW index | Approximate O(log n) |
-| SqlServer | SQL Server / Azure SQL | ANN via VECTOR_SEARCH (DiskANN) |
-
-### File Storage Providers (Document Content)
-
-| Provider | Description | Path Structure |
-|----------|-------------|----------------|
-| Database | Store file content inline in database (default) | N/A (stored in Documents table) |
-| FileSystem | Store files on local disk or network share | `{BasePath}/{ProjectId}/{DocumentId}.{ext}` |
-| AzureBlob | Store files in Azure Blob Storage | `{ContainerName}/{ProjectId}/{DocumentId}.{ext}` |
-
-**Configuration:**
-```json
-{
-  "LocalDocs": {
-    "FileStorage": {
-      "Provider": "FileSystem",
-      "FileSystem": {
-        "BasePath": "./DocumentFiles",
-        "CreateDirectoryIfNotExists": true
-      },
-      "AzureBlob": {
-        "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...",
-        "ContainerName": "documents",
-        "CreateContainerIfNotExists": true
-      }
-    }
-  }
-}
-```
-
-**Backward Compatibility:**
-- Documents with `FileContent` stored inline (legacy) continue to work
-- New documents use the configured provider
-- `FileStorageLocation` property tracks where the file is stored
-
-### SQL Server Vector Store
-
-Uses native `VECTOR(n)` type with DiskANN-based approximate nearest neighbor search.
-
-**Configuration:**
-```json
-{
-  "ConnectionStrings": {
-    "LocalDocs": "Server=myserver.database.windows.net;Database=localdocs;..."
-  },
-  "LocalDocs": {
-    "Storage": {
-      "Provider": "SqlServer",
-      "SqlServer": {
-        "Schema": "dbo",
-        "TableName": "chunk_embeddings",
-        "UseVectorIndex": true,
-        "DistanceMetric": "cosine"
-      }
-    }
-  }
-}
-```
-
-**Note:** All storage providers (Sqlite, SqliteHnsw, SqlServer) use the same `ConnectionStrings:LocalDocs` key. The connection string format changes based on the provider:
-- **Sqlite/SqliteHnsw:** `Data Source=localdocs.db`
-- **SqlServer:** `Server=myserver.database.windows.net;Database=localdocs;...`
-
-**SQL Schema:**
-```sql
-CREATE TABLE [dbo].[chunk_embeddings] (
-    chunk_id NVARCHAR(255) PRIMARY KEY,
-    embedding VECTOR(1536) NOT NULL
-);
-
-CREATE VECTOR INDEX vec_idx_chunk_embeddings 
-ON [dbo].[chunk_embeddings](embedding)
-WITH (metric = 'cosine');
-```
-
-**Requirements:**
-- SQL Server 2025+, Azure SQL Database, or Azure SQL Managed Instance
-- Package: `Microsoft.EntityFrameworkCore.SqlServer`
-
-### MCP Tools
-
-Decorate tool classes with `[McpServerToolType]` and methods with `[McpServerTool]`:
+## MCP Tool Pattern
 
 ```csharp
 [McpServerToolType]
@@ -338,27 +167,69 @@ public sealed class SearchDocsTool
 {
     private readonly DocumentService _documentService;
 
-    public SearchDocsTool(DocumentService documentService)
-    {
+    public SearchDocsTool(DocumentService documentService) =>
         _documentService = documentService;
-    }
 
     [McpServerTool(Name = "search_docs")]
     [Description("Search for documents using semantic search.")]
     public async Task<string> SearchDocsAsync(
         [Description("The search query")] string query,
-        [Description("Optional project filter")] string? projectId = null,
-        CancellationToken cancellationToken = default) { ... }
+        [Description("Optional project ID to filter results")] string? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        try { /* ... */ }
+        catch (Exception ex) { return $"Error searching documents: {ex.Message}"; }
+    }
 }
 ```
 
-## Key Packages
+## Test Patterns
 
-| Package | Purpose |
-|---------|---------|
-| Microsoft.SemanticKernel | AI/ML orchestration |
-| Microsoft.Extensions.VectorData.Abstractions | Vector data interfaces |
-| ModelContextProtocol.AspNetCore | MCP server for ASP.NET Core |
-| Microsoft.EntityFrameworkCore.Sqlite | SQLite persistence |
-| Azure.Storage.Blobs | Azure Blob Storage client |
-| xunit + NSubstitute | Testing and mocking |
+```csharp
+/// <summary>Unit tests for <see cref="DocumentService"/>.</summary>
+public sealed class DocumentServiceTests
+{
+    private readonly IDocumentRepository _repository = Substitute.For<IDocumentRepository>();
+    private readonly IVectorStore _vectorStore = Substitute.For<IVectorStore>();
+    private readonly DocumentService _sut;
+
+    public DocumentServiceTests() =>
+        _sut = new DocumentService(_repository, _vectorStore, ...);
+
+    #region SearchAsync Tests
+
+    [Fact]
+    public async Task SearchAsync_WithNoVectorResults_ReturnsEmptyList()
+    {
+        // Arrange
+        _vectorStore.SearchAsync(Arg.Any<ReadOnlyMemory<float>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        // Act
+        var results = await _sut.SearchAsync("query");
+
+        // Assert
+        Assert.Empty(results);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static Document CreateTestDocument(string id = "doc-1") => new()
+    {
+        Id = id,
+        ProjectId = "project-1",
+        FileName = "test.txt",
+        CreatedAt = DateTimeOffset.UtcNow
+    };
+
+    #endregion
+}
+```
+
+- Group tests with `#region {MethodName} Tests` blocks.
+- Static `#region Helper Methods` block for `CreateTest*()` factories.
+- Every test uses `// Arrange`, `// Act`, `// Assert` comments.
+- Use `Arg.Any<CancellationToken>()` in all substitute setups/verifications.
+- `IDisposable.Dispose()` for cleanup (e.g., deleting temp directories).
