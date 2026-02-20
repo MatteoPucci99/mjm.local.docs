@@ -5,19 +5,19 @@
 <MudDialog>
     <DialogContent>
         <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
-            La versione corrente (v@(Document.VersionNumber)) verra' conservata come storico.
-            I risultati di ricerca punteranno alla nuova versione.
+            The current version (v@(Document.VersionNumber)) will be preserved as history.
+            Search results will point to the new version.
         </MudAlert>
 
         <MudText Typo="Typo.body2" Class="mb-4">
-            <strong>Documento:</strong> @Document.FileName — <strong>Versione corrente:</strong> v@(Document.VersionNumber)
+            <strong>Document:</strong> @Document.FileName — <strong>Current version:</strong> v@(Document.VersionNumber)
         </MudText>
 
         <EditForm Model="@_model" OnValidSubmit="Submit">
             <DataAnnotationsValidator />
 
             <MudTextField @bind-Value="_model.Title"
-                          Label="Titolo"
+                          Label="Title"
                           Required="true"
                           Variant="Variant.Outlined"
                           Class="mb-4"
@@ -26,7 +26,7 @@
                           Immediate="true" />
 
             <MudTextField @bind-Value="_model.Content"
-                          Label="Contenuto"
+                          Label="Content"
                           Required="true"
                           Variant="Variant.Outlined"
                           Lines="15"
@@ -36,12 +36,12 @@
                           Immediate="true" />
 
             <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                Supporta formattazione Markdown. La modifica creera' una nuova versione (v@(Document.VersionNumber + 1)).
+                Supports Markdown formatting. Editing will create a new version (v@(Document.VersionNumber + 1)).
             </MudText>
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_saving">Annulla</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_saving">Cancel</MudButton>
         <MudButton OnClick="Submit"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -50,7 +50,7 @@
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
             }
-            Aggiorna
+            Update
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -103,12 +103,12 @@
 
     private sealed class KnowHowModel
     {
-        [Required(ErrorMessage = "Il titolo e' obbligatorio")]
-        [MaxLength(200, ErrorMessage = "Il titolo non puo' superare i 200 caratteri")]
+        [Required(ErrorMessage = "Title is required")]
+        [MaxLength(200, ErrorMessage = "Title cannot exceed 200 characters")]
         public string? Title { get; set; }
 
-        [Required(ErrorMessage = "Il contenuto e' obbligatorio")]
-        [MaxLength(500000, ErrorMessage = "Il contenuto e' troppo lungo")]
+        [Required(ErrorMessage = "Content is required")]
+        [MaxLength(500000, ErrorMessage = "Content is too long")]
         public string? Content { get; set; }
     }
 }

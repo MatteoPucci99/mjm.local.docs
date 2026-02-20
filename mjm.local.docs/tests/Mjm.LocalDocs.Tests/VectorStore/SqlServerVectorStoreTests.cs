@@ -28,7 +28,7 @@ public sealed class SqlServerVectorStoreTests : IAsyncLifetime
         _connectionString = Environment.GetEnvironmentVariable("SQL_SERVER_CONNECTION_STRING");
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (string.IsNullOrEmpty(_connectionString))
         {
@@ -66,7 +66,7 @@ public sealed class SqlServerVectorStoreTests : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (string.IsNullOrEmpty(_connectionString))
         {
@@ -93,12 +93,12 @@ public sealed class SqlServerVectorStoreTests : IAsyncLifetime
     {
         if (string.IsNullOrEmpty(_connectionString))
         {
-            throw new SkipException("SQL Server connection string not configured. Set SQL_SERVER_CONNECTION_STRING environment variable.");
+            Assert.Skip("SQL Server connection string not configured. Set SQL_SERVER_CONNECTION_STRING environment variable.");
         }
 
-        if (_sut == null)
+        if (_sut is null)
         {
-            throw new SkipException("SQL Server does not support VECTOR type. Requires SQL Server 2025+ or Azure SQL.");
+            Assert.Skip("SQL Server does not support VECTOR type. Requires SQL Server 2025+ or Azure SQL.");
         }
     }
 
@@ -451,10 +451,4 @@ public sealed class SqlServerVectorStoreTests : IAsyncLifetime
     #endregion
 }
 
-/// <summary>
-/// Custom exception to skip tests when preconditions are not met.
-/// </summary>
-public class SkipException : Exception
-{
-    public SkipException(string message) : base(message) { }
-}
+

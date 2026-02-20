@@ -15,14 +15,14 @@
     <div>
         <MudText Typo="Typo.h4">API Tokens</MudText>
         <MudText Typo="Typo.body2" Class="mud-text-secondary">
-            Gestisci i token di autenticazione per il server MCP
+            Manage authentication tokens for the MCP server
         </MudText>
     </div>
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.Add"
                OnClick="OpenCreateDialogAsync">
-        Nuovo Token
+        New Token
     </MudButton>
 </div>
 
@@ -30,9 +30,9 @@
 {
     <MudAlert Severity="Severity.Warning" Class="mb-4">
         <MudText Typo="Typo.body2">
-            <strong>Attenzione:</strong> L'autenticazione MCP e disabilitata.
-            I token non saranno richiesti per accedere all'endpoint MCP.
-            Per abilitare l'autenticazione, imposta <code>LocalDocs:Mcp:RequireAuthentication</code> a <code>true</code> in appsettings.json.
+            <strong>Warning:</strong> MCP authentication is disabled.
+            Tokens will not be required to access the MCP endpoint.
+            To enable authentication, set <code>LocalDocs:Mcp:RequireAuthentication</code> to <code>true</code> in appsettings.json.
         </MudText>
     </MudAlert>
 }
@@ -44,7 +44,7 @@
 else if (_tokens.Count == 0)
 {
     <MudAlert Severity="Severity.Info">
-        Non ci sono token configurati. Clicca su "Nuovo Token" per crearne uno.
+        No tokens configured. Click "New Token" to create one.
     </MudAlert>
 }
 else
@@ -58,61 +58,61 @@ else
                  Striped="true"
                  Hover="true">
         <Columns>
-            <PropertyColumn Property="x => x.Name" Title="Nome" Sortable="true" />
-            <TemplateColumn Title="Prefisso" Sortable="false">
+            <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
+            <TemplateColumn Title="Prefix" Sortable="false">
                 <CellTemplate>
                     <MudText Typo="Typo.body2">
                         <code>@(context.Item.TokenPrefix ?? "-")...</code>
                     </MudText>
                 </CellTemplate>
             </TemplateColumn>
-            <TemplateColumn Title="Stato" Sortable="true">
+            <TemplateColumn Title="Status" Sortable="true">
                 <CellTemplate>
                     @if (context.Item.IsRevoked)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Revocato</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Revoked</MudChip>
                     }
                     else if (context.Item.ExpiresAt.HasValue && context.Item.ExpiresAt.Value < DateTimeOffset.UtcNow)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Scaduto</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Expired</MudChip>
                     }
                     else
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Attivo</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Active</MudChip>
                     }
                 </CellTemplate>
             </TemplateColumn>
-            <TemplateColumn Title="Creato" Sortable="true">
+            <TemplateColumn Title="Created" Sortable="true">
                 <CellTemplate>
                     <MudText Typo="Typo.body2">@context.Item.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
                 </CellTemplate>
             </TemplateColumn>
-            <TemplateColumn Title="Scadenza" Sortable="true">
+            <TemplateColumn Title="Expiry" Sortable="true">
                 <CellTemplate>
                     <MudText Typo="Typo.body2">
-                        @(context.Item.ExpiresAt?.LocalDateTime.ToString("dd/MM/yyyy HH:mm") ?? "Mai")
+                        @(context.Item.ExpiresAt?.LocalDateTime.ToString("dd/MM/yyyy HH:mm") ?? "Never")
                     </MudText>
                 </CellTemplate>
             </TemplateColumn>
-            <TemplateColumn Title="Ultimo Uso" Sortable="true">
+            <TemplateColumn Title="Last Used" Sortable="true">
                 <CellTemplate>
                     <MudText Typo="Typo.body2">
-                        @(context.Item.LastUsedAt?.LocalDateTime.ToString("dd/MM/yyyy HH:mm") ?? "Mai")
+                        @(context.Item.LastUsedAt?.LocalDateTime.ToString("dd/MM/yyyy HH:mm") ?? "Never")
                     </MudText>
                 </CellTemplate>
             </TemplateColumn>
-            <TemplateColumn Title="Azioni" Sortable="false">
+            <TemplateColumn Title="Actions" Sortable="false">
                 <CellTemplate>
                     @if (!context.Item.IsRevoked && context.Item.IsValid)
                     {
-                        <MudTooltip Text="Revoca">
+                        <MudTooltip Text="Revoke">
                             <MudIconButton Icon="@Icons.Material.Filled.Block"
                                            Size="Size.Small"
                                            Color="Color.Warning"
                                            OnClick="@(() => RevokeTokenAsync(context.Item))" />
                         </MudTooltip>
                     }
-                    <MudTooltip Text="Elimina">
+                    <MudTooltip Text="Delete">
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Size="Size.Small"
                                        Color="Color.Error"
@@ -127,12 +127,12 @@ else
 @* Dialog per mostrare il token creato *@
 <MudDialog @bind-Visible="_showTokenDialog" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6">Token Creato</MudText>
+        <MudText Typo="Typo.h6">Token Created</MudText>
     </TitleContent>
     <DialogContent>
         <MudAlert Severity="Severity.Warning" Class="mb-4">
             <MudText Typo="Typo.body2">
-                <strong>Importante:</strong> Copia questo token ora. Non sara piu possibile visualizzarlo.
+                <strong>Important:</strong> Copy this token now. It will no longer be visible after closing this dialog.
             </MudText>
         </MudAlert>
         <MudTextField @bind-Value="_newlyCreatedToken"
@@ -145,11 +145,11 @@ else
                       FullWidth="true"
                       Class="mb-4" />
         <MudText Typo="Typo.body2" Class="mud-text-secondary">
-            Usa questo token nell'header <code>Authorization: Bearer &lt;token&gt;</code> per autenticare le richieste MCP.
+            Use this token in the <code>Authorization: Bearer &lt;token&gt;</code> header to authenticate MCP requests.
         </MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="CloseTokenDialog" Variant="Variant.Filled" Color="Color.Primary">Chiudi</MudButton>
+        <MudButton OnClick="CloseTokenDialog" Variant="Variant.Filled" Color="Color.Primary">Close</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -179,7 +179,7 @@ else
     {
         var parameters = new DialogParameters<CreateTokenDialog>();
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<CreateTokenDialog>("Nuovo Token", parameters, options);
+        var dialog = await DialogService.ShowAsync<CreateTokenDialog>("New Token", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false, Data: CreateTokenResult tokenResult })
@@ -194,11 +194,11 @@ else
                 _showTokenDialog = true;
 
                 await LoadTokensAsync();
-                Snackbar.Add($"Token \"{token.Name}\" creato con successo.", Severity.Success);
+                Snackbar.Add($"Token \"{token.Name}\" created successfully.", Severity.Success);
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Errore durante la creazione del token: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Error creating token: {ex.Message}", Severity.Error);
             }
         }
     }
@@ -207,13 +207,13 @@ else
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
-            { x => x.ContentText, $"Sei sicuro di voler revocare il token \"{token.Name}\"? Il token non potra piu essere utilizzato per l'autenticazione." },
-            { x => x.ButtonText, "Revoca" },
+            { x => x.ContentText, $"Are you sure you want to revoke token \"{token.Name}\"? The token will no longer be usable for authentication." },
+            { x => x.ButtonText, "Revoke" },
             { x => x.Color, Color.Warning }
         };
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Conferma Revoca", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Revocation", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -221,12 +221,12 @@ else
             var revoked = await TokenService.RevokeTokenAsync(token.Id);
             if (revoked)
             {
-                Snackbar.Add($"Token \"{token.Name}\" revocato con successo.", Severity.Success);
+                Snackbar.Add($"Token \"{token.Name}\" revoked successfully.", Severity.Success);
                 await LoadTokensAsync();
             }
             else
             {
-                Snackbar.Add("Errore durante la revoca del token.", Severity.Error);
+                Snackbar.Add("Error revoking token.", Severity.Error);
             }
         }
     }
@@ -235,13 +235,13 @@ else
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
-            { x => x.ContentText, $"Sei sicuro di voler eliminare permanentemente il token \"{token.Name}\"?" },
-            { x => x.ButtonText, "Elimina" },
+            { x => x.ContentText, $"Are you sure you want to permanently delete token \"{token.Name}\"?" },
+            { x => x.ButtonText, "Delete" },
             { x => x.Color, Color.Error }
         };
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Conferma Eliminazione", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Deletion", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -249,12 +249,12 @@ else
             var deleted = await TokenService.DeleteTokenAsync(token.Id);
             if (deleted)
             {
-                Snackbar.Add($"Token \"{token.Name}\" eliminato con successo.", Severity.Success);
+                Snackbar.Add($"Token \"{token.Name}\" deleted successfully.", Severity.Success);
                 await LoadTokensAsync();
             }
             else
             {
-                Snackbar.Add("Errore durante l'eliminazione del token.", Severity.Error);
+                Snackbar.Add("Error deleting token.", Severity.Error);
             }
         }
     }
@@ -263,7 +263,7 @@ else
     {
         // Note: Clipboard API requires JavaScript interop
         // For now, show a message that the token can be manually copied
-        Snackbar.Add("Seleziona e copia il token manualmente (Ctrl+C)", Severity.Info);
+        Snackbar.Add("Select and copy the token manually (Ctrl+C)", Severity.Info);
     }
 
     private void CloseTokenDialog()

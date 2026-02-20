@@ -7,37 +7,37 @@
             <DataAnnotationsValidator />
             
             <MudTextField @bind-Value="_model.Name"
-                          Label="Nome"
-                          Placeholder="es. Claude Code, Produzione, Test..."
+                          Label="Name"
+                          Placeholder="e.g. Claude Code, Production, Test..."
                           Variant="Variant.Outlined"
                           Required="true"
                           For="@(() => _model.Name)"
                           Class="mb-4"
-                          HelperText="Un nome identificativo per questo token" />
+                          HelperText="A descriptive name for this token" />
 
             <MudCheckBox @bind-Value="_hasExpiration" 
-                         Label="Imposta data di scadenza" 
+                         Label="Set expiration date" 
                          Color="Color.Primary"
                          Class="mb-4" />
 
             @if (_hasExpiration)
             {
                 <MudDatePicker @bind-Date="_expirationDate"
-                               Label="Data di scadenza"
+                               Label="Expiration date"
                                Variant="Variant.Outlined"
                                MinDate="@DateTime.Today.AddDays(1)"
                                Class="mb-4"
-                               HelperText="Il token non sara piu valido dopo questa data" />
+                               HelperText="The token will not be valid after this date" />
             }
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Annulla</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
         <MudButton Color="Color.Primary" 
                    Variant="Variant.Filled" 
                    OnClick="Submit"
                    Disabled="@string.IsNullOrWhiteSpace(_model.Name)">
-            Crea Token
+            Create Token
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -70,8 +70,8 @@
 
     private sealed class TokenFormModel
     {
-        [Required(ErrorMessage = "Il nome e obbligatorio")]
-        [StringLength(200, ErrorMessage = "Il nome non puo superare i 200 caratteri")]
+        [Required(ErrorMessage = "Name is required")]
+        [StringLength(200, ErrorMessage = "Name cannot exceed 200 characters")]
         public string Name { get; set; } = string.Empty;
     }
 }

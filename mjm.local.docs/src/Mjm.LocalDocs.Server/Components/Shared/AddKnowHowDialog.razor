@@ -4,40 +4,40 @@
 <MudDialog>
     <DialogContent>
         <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
-            Crea un documento di know how. Il contenuto verra' indicizzato per la ricerca semantica.
+            Create a know how document. The content will be indexed for semantic search.
         </MudAlert>
 
         <EditForm Model="@_model" OnValidSubmit="Submit">
             <DataAnnotationsValidator />
 
             <MudTextField @bind-Value="_model.Title"
-                          Label="Titolo"
+                          Label="Title"
                           Required="true"
                           Variant="Variant.Outlined"
                           Class="mb-4"
                           MaxLength="200"
-                          Placeholder="Es. Guida al deploy in produzione"
+                          Placeholder="e.g. Production deployment guide"
                           For="@(() => _model.Title)"
                           Immediate="true" />
 
             <MudTextField @bind-Value="_model.Content"
-                          Label="Contenuto"
+                          Label="Content"
                           Required="true"
                           Variant="Variant.Outlined"
                           Lines="15"
                           MaxLength="500000"
-                          Placeholder="Scrivi il contenuto del know how... Puoi usare la formattazione Markdown."
+                          Placeholder="Write the know how content... You can use Markdown formatting."
                           For="@(() => _model.Content)"
                           Class="mb-2"
                           Immediate="true" />
 
             <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                Supporta formattazione Markdown. Il documento verra' salvato come file .md
+                Supports Markdown formatting. The document will be saved as a .md file.
             </MudText>
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_saving">Annulla</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_saving">Cancel</MudButton>
         <MudButton OnClick="Submit"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -46,7 +46,7 @@
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
             }
-            Salva
+            Save
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -83,12 +83,12 @@
 
     private sealed class KnowHowModel
     {
-        [Required(ErrorMessage = "Il titolo e' obbligatorio")]
-        [MaxLength(200, ErrorMessage = "Il titolo non puo' superare i 200 caratteri")]
+        [Required(ErrorMessage = "Title is required")]
+        [MaxLength(200, ErrorMessage = "Title cannot exceed 200 characters")]
         public string? Title { get; set; }
 
-        [Required(ErrorMessage = "Il contenuto e' obbligatorio")]
-        [MaxLength(500000, ErrorMessage = "Il contenuto e' troppo lungo")]
+        [Required(ErrorMessage = "Content is required")]
+        [MaxLength(500000, ErrorMessage = "Content is too long")]
         public string? Content { get; set; }
     }
 }

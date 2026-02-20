@@ -25,7 +25,7 @@ else
                     <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
                     <div>
                         <MudText Typo="Typo.h4" Color="Color.Primary">@_projectCount</MudText>
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Progetti</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Projects</MudText>
                     </div>
                 </div>
             </MudPaper>
@@ -37,7 +37,7 @@ else
                     <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Secondary" Size="Size.Large" Class="mr-3" />
                     <div>
                         <MudText Typo="Typo.h4" Color="Color.Secondary">@_documentCount</MudText>
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Documenti</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Documents</MudText>
                     </div>
                 </div>
             </MudPaper>
@@ -49,7 +49,7 @@ else
                     <MudIcon Icon="@Icons.Material.Filled.Storage" Color="Color.Info" Size="Size.Large" Class="mr-3" />
                     <div>
                         <MudText Typo="Typo.h4" Color="Color.Info">@FormatFileSize(_totalSize)</MudText>
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Dimensione Totale</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Total Size</MudText>
                     </div>
                 </div>
             </MudPaper>
@@ -57,7 +57,7 @@ else
         
         @* Quick Actions *@
         <MudItem xs="12">
-            <MudText Typo="Typo.h6" Class="mb-3 mt-4">Azioni Rapide</MudText>
+            <MudText Typo="Typo.h6" Class="mb-3 mt-4">Quick Actions</MudText>
         </MudItem>
         
         <MudItem xs="12" sm="6" md="4">
@@ -67,7 +67,7 @@ else
                        FullWidth="true"
                        Size="Size.Large"
                        OnClick="@(() => Navigation.NavigateTo("/projects/new"))">
-                Nuovo Progetto
+                New Project
             </MudButton>
         </MudItem>
         
@@ -78,7 +78,7 @@ else
                        FullWidth="true"
                        Size="Size.Large"
                        OnClick="@(() => Navigation.NavigateTo("/projects"))">
-                Tutti i Progetti
+                All Projects
             </MudButton>
         </MudItem>
         
@@ -86,7 +86,7 @@ else
         @if (_recentProjects.Count > 0)
         {
             <MudItem xs="12">
-                <MudText Typo="Typo.h6" Class="mb-3 mt-4">Progetti Recenti</MudText>
+                <MudText Typo="Typo.h6" Class="mb-3 mt-4">Recent Projects</MudText>
             </MudItem>
             
             @foreach (var project in _recentProjects)
@@ -105,12 +105,12 @@ else
                                 </MudText>
                             }
                             <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2">
-                                @GetDocumentCountForProject(project.Id) documenti
+                                @GetDocumentCountForProject(project.Id) documents
                             </MudText>
                         </MudCardContent>
                         <MudCardActions>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small">
-                                Apri
+                                Open
                             </MudButton>
                         </MudCardActions>
                     </MudCard>
@@ -121,7 +121,7 @@ else
         {
             <MudItem xs="12">
                 <MudAlert Severity="Severity.Info" Class="mt-4">
-                    Non hai ancora creato nessun progetto. Clicca su "Nuovo Progetto" per iniziare.
+                    You haven't created any projects yet. Click "New Project" to get started.
                 </MudAlert>
             </MudItem>
         }

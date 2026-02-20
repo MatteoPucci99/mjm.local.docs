@@ -5,19 +5,19 @@
     <DialogContent>
         @if (Versions is null || Versions.Count == 0)
         {
-            <MudText Typo="Typo.body1">Nessuna versione trovata.</MudText>
+            <MudText Typo="Typo.body1">No versions found.</MudText>
         }
         else
         {
             <MudSimpleTable Dense="true" Hover="true" Striped="true" Style="overflow-x: auto;">
                 <thead>
                     <tr>
-                        <th>Versione</th>
-                        <th>Nome File</th>
-                        <th>Tipo</th>
-                        <th>Dimensione</th>
-                        <th>Data</th>
-                        <th>Stato</th>
+                        <th>Version</th>
+                        <th>File Name</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Date</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -40,13 +40,13 @@
                                 @if (version.IsSuperseded)
                                 {
                                     <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
-                                        Sostituito
+                                        Superseded
                                     </MudChip>
                                 }
                                 else
                                 {
                                     <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
-                                        Corrente
+                                        Current
                                     </MudChip>
                                 }
                             </td>
@@ -57,7 +57,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Close" Variant="Variant.Text">Chiudi</MudButton>
+        <MudButton OnClick="Close" Variant="Variant.Text">Close</MudButton>
     </DialogActions>
 </MudDialog>
 
