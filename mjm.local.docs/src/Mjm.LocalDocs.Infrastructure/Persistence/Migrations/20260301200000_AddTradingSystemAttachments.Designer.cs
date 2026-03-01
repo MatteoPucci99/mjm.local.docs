@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using Mjm.LocalDocs.Infrastructure.Persistence;
 namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LocalDocsDbContext))]
-    partial class LocalDocsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260301200000_AddTradingSystemAttachments")]
+    partial class AddTradingSystemAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");

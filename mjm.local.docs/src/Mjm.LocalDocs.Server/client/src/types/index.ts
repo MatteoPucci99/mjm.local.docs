@@ -111,6 +111,16 @@ export interface TradingSystemListItem {
   updatedAt: string | null;
 }
 
+export interface TradingSystemAttachment {
+  id: string;
+  tradingSystemId: string;
+  fileName: string;
+  fileExtension: string;
+  contentType: string;
+  fileSizeBytes: number;
+  createdAt: string;
+}
+
 export interface TradingSystemStatusInfo {
   value: TradingSystemStatus;
   label: string;

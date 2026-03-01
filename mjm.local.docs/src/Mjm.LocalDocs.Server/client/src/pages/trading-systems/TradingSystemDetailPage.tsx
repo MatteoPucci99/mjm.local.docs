@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -13,15 +13,17 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Divider from '@mui/material/Divider';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
 import InputAdornment from '@mui/material/InputAdornment';
 import { alpha } from '@mui/material/styles';
+import NavigateBeforeRoundedIcon from '@mui/icons-material/NavigateBeforeRounded';
+import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
+import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded';
+import InsertDriveFileRoundedIcon from '@mui/icons-material/InsertDriveFileRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
@@ -33,13 +35,13 @@ import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
-import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
 import { useSnackbar } from 'notistack';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import FileDropzone from '../../components/shared/FileDropzone';
 import StatusChip, { getStatusOptions } from '../../components/trading-systems/StatusChip';
+import CodeEditor from '../../components/trading-systems/CodeEditor';
 import {
   useTradingSystem,
   useTradingSystemCode,
@@ -54,8 +56,8 @@ import {
   useDeleteTradingSystem,
 } from '../../hooks/useTradingSystems';
 import { formatDate, formatFileSize } from '../../utils/formatters';
-import { downloadDocumentFile } from '../../api/documents';
-import type { TradingSystemStatus } from '../../types';
+import { getAttachmentFileUrl, downloadAttachmentFile } from '../../api/tradingSystems';
+import type { TradingSystemStatus, TradingSystemAttachment } from '../../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -71,14 +73,203 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
+function isImageContentType(contentType: string): boolean {
+  return contentType.startsWith('image/');
+}
+
+function getFileIcon(contentType: string) {
+  if (contentType.startsWith('image/')) return <ImageRoundedIcon />;
+  if (contentType === 'application/pdf') return <PictureAsPdfRoundedIcon />;
+  return <InsertDriveFileRoundedIcon />;
+}
+
+function AttachmentCarousel({
+  attachments,
+  tradingSystemId,
+  onRemove,
+}: {
+  attachments: TradingSystemAttachment[];
+  tradingSystemId: string;
+  onRemove: (id: string) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Clamp index if attachments change
+  useEffect(() => {
+    if (selectedIndex >= attachments.length) {
+      setSelectedIndex(Math.max(0, attachments.length - 1));
+    }
+  }, [attachments.length, selectedIndex]);
+
+  const selected = attachments[selectedIndex];
+  if (!selected) return null;
+
+  const isImage = isImageContentType(selected.contentType);
+  const fileUrl = getAttachmentFileUrl(tradingSystemId, selected.id);
+
+  return (
+    <Box sx={{ mt: 3 }}>
+      {/* Main viewer */}
+      <Box
+        sx={(theme) => ({
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 300,
+          maxHeight: 500,
+          borderRadius: 2,
+          bgcolor: alpha(theme.palette.background.default, 0.5),
+          border: `1px solid ${theme.palette.divider}`,
+          overflow: 'hidden',
+          mb: 2,
+        })}
+      >
+        {/* Previous button */}
+        {attachments.length > 1 && (
+          <IconButton
+            sx={{ position: 'absolute', left: 8, zIndex: 1, bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.paper' } }}
+            onClick={() => setSelectedIndex((i) => (i - 1 + attachments.length) % attachments.length)}
+          >
+            <NavigateBeforeRoundedIcon />
+          </IconButton>
+        )}
+
+        {isImage ? (
+          <Box
+            component="img"
+            src={fileUrl}
+            alt={selected.fileName}
+            sx={{ maxWidth: '100%', maxHeight: 480, objectFit: 'contain' }}
+          />
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 6 }}>
+            {getFileIcon(selected.contentType)}
+            <Typography variant="h6" sx={{ mt: 1 }}>
+              {selected.fileName}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {formatFileSize(selected.fileSizeBytes)}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Next button */}
+        {attachments.length > 1 && (
+          <IconButton
+            sx={{ position: 'absolute', right: 8, zIndex: 1, bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.paper' } }}
+            onClick={() => setSelectedIndex((i) => (i + 1) % attachments.length)}
+          >
+            <NavigateNextRoundedIcon />
+          </IconButton>
+        )}
+      </Box>
+
+      {/* File info and actions bar */}
+      <Box
+        sx={(theme) => ({
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          p: 1.5,
+          borderRadius: 1,
+          bgcolor: alpha(theme.palette.primary.main, 0.05),
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          mb: 2,
+        })}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <AttachFileRoundedIcon sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2" fontWeight={500}>{selected.fileName}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatFileSize(selected.fileSizeBytes)} &bull; {formatDate(selected.createdAt)}
+              {attachments.length > 1 && ` \u2022 ${selectedIndex + 1} / ${attachments.length}`}
+            </Typography>
+          </Box>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Download">
+            <IconButton
+              size="small"
+              onClick={() => downloadAttachmentFile(tradingSystemId, selected.id, selected.fileName)}
+            >
+              <DownloadRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Remove">
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => onRemove(selected.id)}
+            >
+              <DeleteRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+
+      {/* Thumbnails */}
+      {attachments.length > 1 && (
+        <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1 }}>
+          {attachments.map((att, i) => {
+            const thumbUrl = getAttachmentFileUrl(tradingSystemId, att.id);
+            const isThumbImage = isImageContentType(att.contentType);
+            return (
+              <Box
+                key={att.id}
+                onClick={() => setSelectedIndex(i)}
+                sx={(theme) => ({
+                  width: 72,
+                  height: 72,
+                  minWidth: 72,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: i === selectedIndex
+                    ? `2px solid ${theme.palette.primary.main}`
+                    : `1px solid ${theme.palette.divider}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: alpha(theme.palette.background.default, 0.5),
+                  opacity: i === selectedIndex ? 1 : 0.7,
+                  transition: 'opacity 0.2s, border-color 0.2s',
+                  '&:hover': { opacity: 1 },
+                })}
+              >
+                {isThumbImage ? (
+                  <Box
+                    component="img"
+                    src={thumbUrl}
+                    alt={att.fileName}
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Box sx={{ textAlign: 'center', fontSize: 10 }}>
+                    {getFileIcon(att.contentType)}
+                    <Typography variant="caption" noWrap sx={{ display: 'block', maxWidth: 64, fontSize: 9 }}>
+                      {att.fileName}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 export default function TradingSystemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
 
   const { data: system, isLoading: systemLoading } = useTradingSystem(id!);
-  const { data: code, isLoading: codeLoading } = useTradingSystemCode(id!);
-  const { data: attachments, isLoading: attachmentsLoading } = useTradingSystemAttachments(id!);
+  const { data: code } = useTradingSystemCode(id!);
+  const { data: attachments } = useTradingSystemAttachments(id!);
 
   const updateMutation = useUpdateTradingSystem();
   const updateStatusMutation = useUpdateTradingSystemStatus();
@@ -525,23 +716,13 @@ export default function TradingSystemDetailPage() {
               </Alert>
             )}
 
-            <TextField
-              fullWidth
-              multiline
-              rows={20}
+            <CodeEditor
               value={editedCode}
-              onChange={(e) => {
-                setEditedCode(e.target.value);
+              onChange={(v) => {
+                setEditedCode(v);
                 setCodeChanged(true);
               }}
-              placeholder="// Enter your EasyLanguage code here..."
-              sx={{
-                '& .MuiInputBase-input': {
-                  fontFamily: 'monospace',
-                  fontSize: '0.875rem',
-                  lineHeight: 1.5,
-                },
-              }}
+              height="500px"
             />
           </CardContent>
         </Card>
@@ -556,7 +737,7 @@ export default function TradingSystemDetailPage() {
             </Typography>
 
             <FileDropzone
-              onDrop={handleAddAttachment}
+              onFilesSelected={handleAddAttachment}
               accept={{
                 'image/*': [],
                 'application/pdf': [],
@@ -564,60 +745,14 @@ export default function TradingSystemDetailPage() {
                 'application/vnd.ms-excel': [],
                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [],
               }}
-              multiple
             />
 
             {attachments && attachments.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Uploaded Files
-                </Typography>
-                <Stack spacing={1}>
-                  {attachments.map((att) => (
-                    <Box
-                      key={att.id}
-                      sx={(theme) => ({
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        p: 1.5,
-                        borderRadius: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.05),
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                      })}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <AttachFileRoundedIcon sx={{ color: 'text.secondary' }} />
-                        <Box>
-                          <Typography variant="body2">{att.fileName}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatFileSize(att.fileSizeBytes)} • {formatDate(att.createdAt)}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Stack direction="row" spacing={1}>
-                        <Tooltip title="Download">
-                          <IconButton
-                            size="small"
-                            onClick={() => downloadDocumentFile(att.id, att.fileName)}
-                          >
-                            <DownloadRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Remove">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveAttachment(att.id)}
-                          >
-                            <DeleteRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
+              <AttachmentCarousel
+                attachments={attachments}
+                tradingSystemId={system.id}
+                onRemove={handleRemoveAttachment}
+              />
             )}
           </CardContent>
         </Card>

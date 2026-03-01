@@ -26,3 +26,13 @@ public record TradingSystemListItemResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt
 );
+
+public record TradingSystemAttachmentResponse(
+    string Id,
+    string TradingSystemId,
+    string FileName,
+    string FileExtension,
+    string ContentType,
+    long FileSizeBytes,
+    DateTimeOffset CreatedAt
+);

@@ -149,7 +149,7 @@ export default function TradingSystemListPage() {
       ) : (
         <Grid container spacing={2}>
           {filteredSystems.map((system) => (
-            <Grid item xs={12} sm={6} md={4} key={system.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={system.id}>
               <TradingSystemCard system={system} onClick={() => navigate(`/trading-systems/${system.id}`)} />
             </Grid>
           ))}

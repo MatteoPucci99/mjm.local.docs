@@ -12,7 +12,7 @@ import type { TradingSystemStatus } from '../../types';
 interface StatusChipProps {
   status: TradingSystemStatus;
   size?: ChipProps['size'];
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 const statusConfig: Record<

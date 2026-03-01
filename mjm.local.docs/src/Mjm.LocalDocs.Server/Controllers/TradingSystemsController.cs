@@ -216,7 +216,7 @@ public sealed class TradingSystemsController : ControllerBase
     /// Gets all attachments for a trading system.
     /// </summary>
     [HttpGet("{id}/attachments")]
-    public async Task<ActionResult<IReadOnlyList<DocumentResponse>>> GetAttachments(
+    public async Task<ActionResult<IReadOnlyList<TradingSystemAttachmentResponse>>> GetAttachments(
         string id,
         CancellationToken cancellationToken = default)
     {
@@ -225,18 +225,7 @@ public sealed class TradingSystemsController : ControllerBase
             return NotFound();
 
         var attachments = await _service.GetAttachmentsAsync(id, cancellationToken);
-        var response = attachments.Select(d => new DocumentResponse(
-            d.Id,
-            d.ProjectId,
-            d.FileName,
-            d.FileExtension,
-            d.FileSizeBytes,
-            d.VersionNumber,
-            d.ParentDocumentId,
-            d.IsSuperseded,
-            d.CreatedAt,
-            d.UpdatedAt
-        )).ToList();
+        var response = attachments.Select(MapToAttachmentResponse).ToList();
 
         return Ok(response);
     }
@@ -245,7 +234,7 @@ public sealed class TradingSystemsController : ControllerBase
     /// Adds an attachment to a trading system.
     /// </summary>
     [HttpPost("{id}/attachments")]
-    public async Task<ActionResult<DocumentResponse>> AddAttachment(
+    public async Task<ActionResult<TradingSystemAttachmentResponse>> AddAttachment(
         string id,
         IFormFile file,
         CancellationToken cancellationToken = default)
@@ -259,24 +248,29 @@ public sealed class TradingSystemsController : ControllerBase
 
         try
         {
-            var doc = await _service.AddAttachmentAsync(id, file.FileName, content, cancellationToken);
-            return Ok(new DocumentResponse(
-                doc.Id,
-                doc.ProjectId,
-                doc.FileName,
-                doc.FileExtension,
-                doc.FileSizeBytes,
-                doc.VersionNumber,
-                doc.ParentDocumentId,
-                doc.IsSuperseded,
-                doc.CreatedAt,
-                doc.UpdatedAt
-            ));
+            var attachment = await _service.AddAttachmentAsync(id, file.FileName, content, file.ContentType, cancellationToken);
+            return Ok(MapToAttachmentResponse(attachment));
         }
         catch (InvalidOperationException)
         {
             return NotFound();
         }
+    }
+
+    /// <summary>
+    /// Gets the file content of an attachment for inline viewing.
+    /// </summary>
+    [HttpGet("{id}/attachments/{attachmentId}/file")]
+    public async Task<IActionResult> GetAttachmentFile(
+        string id,
+        string attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        var attachment = await _service.GetAttachmentByIdAsync(attachmentId, cancellationToken);
+        if (attachment == null || attachment.TradingSystemId != id)
+            return NotFound();
+
+        return File(attachment.FileContent, attachment.ContentType, attachment.FileName);
     }
 
     /// <summary>
@@ -353,6 +347,19 @@ public sealed class TradingSystemsController : ControllerBase
             system.AttachmentDocumentIds.Count,
             system.CreatedAt,
             system.UpdatedAt
+        );
+    }
+
+    private static TradingSystemAttachmentResponse MapToAttachmentResponse(Core.Models.TradingSystemAttachment att)
+    {
+        return new TradingSystemAttachmentResponse(
+            att.Id,
+            att.TradingSystemId,
+            att.FileName,
+            att.FileExtension,
+            att.ContentType,
+            att.FileSizeBytes,
+            att.CreatedAt
         );
     }
 

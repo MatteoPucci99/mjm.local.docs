@@ -19,6 +19,7 @@ public sealed class LocalDocsDbContext : DbContext
     public DbSet<DocumentChunkEntity> DocumentChunks => Set<DocumentChunkEntity>();
     public DbSet<ApiTokenEntity> ApiTokens => Set<ApiTokenEntity>();
     public DbSet<TradingSystemEntity> TradingSystems => Set<TradingSystemEntity>();
+    public DbSet<TradingSystemAttachmentEntity> TradingSystemAttachments => Set<TradingSystemAttachmentEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,7 @@ public sealed class LocalDocsDbContext : DbContext
         ConfigureDocumentChunk(modelBuilder);
         ConfigureApiToken(modelBuilder);
         ConfigureTradingSystem(modelBuilder);
+        ConfigureTradingSystemAttachment(modelBuilder);
     }
 
     private static void ConfigureProject(ModelBuilder modelBuilder)
@@ -256,6 +258,51 @@ public sealed class LocalDocsDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CodeDocumentId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureTradingSystemAttachment(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TradingSystemAttachmentEntity>(entity =>
+        {
+            entity.ToTable("TradingSystemAttachments");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .IsRequired();
+
+            entity.Property(e => e.TradingSystemId)
+                .HasMaxLength(36)
+                .IsRequired();
+
+            entity.Property(e => e.FileName)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.FileExtension)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.ContentType)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.FileSizeBytes)
+                .IsRequired();
+
+            entity.Property(e => e.FileContent)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+
+            entity.HasIndex(e => e.TradingSystemId);
+
+            entity.HasOne(e => e.TradingSystem)
+                .WithMany()
+                .HasForeignKey(e => e.TradingSystemId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

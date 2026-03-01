@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { TradingSystem, TradingSystemListItem, TradingSystemStatus, TradingSystemStatusInfo, Document } from '../types';
+import type { TradingSystem, TradingSystemListItem, TradingSystemStatus, TradingSystemStatusInfo, TradingSystemAttachment } from '../types';
 
 export async function getTradingSystems(
   status?: TradingSystemStatus,
@@ -82,15 +82,15 @@ export async function exportTradingSystemCode(id: string, fileName: string): Pro
   window.URL.revokeObjectURL(url);
 }
 
-export async function getTradingSystemAttachments(id: string): Promise<Document[]> {
-  const { data } = await apiClient.get<Document[]>(`/tradingsystems/${id}/attachments`);
+export async function getTradingSystemAttachments(id: string): Promise<TradingSystemAttachment[]> {
+  const { data } = await apiClient.get<TradingSystemAttachment[]>(`/tradingsystems/${id}/attachments`);
   return data;
 }
 
-export async function addTradingSystemAttachment(id: string, file: File): Promise<Document> {
+export async function addTradingSystemAttachment(id: string, file: File): Promise<TradingSystemAttachment> {
   const formData = new FormData();
   formData.append('file', file);
-  const { data } = await apiClient.post<Document>(`/tradingsystems/${id}/attachments`, formData, {
+  const { data } = await apiClient.post<TradingSystemAttachment>(`/tradingsystems/${id}/attachments`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
@@ -98,6 +98,22 @@ export async function addTradingSystemAttachment(id: string, file: File): Promis
 
 export async function removeTradingSystemAttachment(id: string, attachmentId: string): Promise<void> {
   await apiClient.delete(`/tradingsystems/${id}/attachments/${attachmentId}`);
+}
+
+export function getAttachmentFileUrl(tradingSystemId: string, attachmentId: string): string {
+  return `/api/tradingsystems/${tradingSystemId}/attachments/${attachmentId}/file`;
+}
+
+export async function downloadAttachmentFile(tradingSystemId: string, attachmentId: string, fileName: string): Promise<void> {
+  const response = await apiClient.get(`/tradingsystems/${tradingSystemId}/attachments/${attachmentId}/file`, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export async function deleteTradingSystem(id: string): Promise<void> {

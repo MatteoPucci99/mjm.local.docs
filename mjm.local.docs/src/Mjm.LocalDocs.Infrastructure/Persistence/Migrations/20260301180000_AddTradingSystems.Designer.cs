@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mjm.LocalDocs.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using Mjm.LocalDocs.Infrastructure.Persistence;
 namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(LocalDocsDbContext))]
-    partial class LocalDocsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260301180000_AddTradingSystems")]
+    partial class AddTradingSystems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -167,41 +170,6 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                     b.ToTable("Projects", (string)null);
                 });
 
-            modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemAttachmentEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(36);
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100);
-
-                    b.Property<DateTimeOffset>("CreatedAt");
-
-                    b.Property<byte[]>("FileContent")
-                        .IsRequired();
-
-                    b.Property<string>("FileExtension")
-                        .IsRequired()
-                        .HasMaxLength(20);
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(500);
-
-                    b.Property<long>("FileSizeBytes");
-
-                    b.Property<string>("TradingSystemId")
-                        .IsRequired()
-                        .HasMaxLength(36);
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TradingSystemId");
-
-                    b.ToTable("TradingSystemAttachments", (string)null);
-                });
-
             modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -279,17 +247,6 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.ProjectEntity", b =>
                 {
                     b.Navigation("Documents");
-                });
-
-            modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemAttachmentEntity", b =>
-                {
-                    b.HasOne("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemEntity", "TradingSystem")
-                        .WithMany()
-                        .HasForeignKey("TradingSystemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TradingSystem");
                 });
 
             modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemEntity", b =>

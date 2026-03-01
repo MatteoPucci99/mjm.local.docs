@@ -24,6 +24,7 @@ public sealed class TradingSystemService
     private readonly IDocumentRepository _documentRepository;
     private readonly IProjectRepository _projectRepository;
     private readonly DocumentService _documentService;
+    private readonly ITradingSystemAttachmentRepository _attachmentRepository;
 
     /// <summary>
     /// Creates a new TradingSystemService.
@@ -32,12 +33,14 @@ public sealed class TradingSystemService
         ITradingSystemRepository repository,
         IDocumentRepository documentRepository,
         IProjectRepository projectRepository,
-        DocumentService documentService)
+        DocumentService documentService,
+        ITradingSystemAttachmentRepository attachmentRepository)
     {
         _repository = repository;
         _documentRepository = documentRepository;
         _projectRepository = projectRepository;
         _documentService = documentService;
+        _attachmentRepository = attachmentRepository;
     }
 
     /// <summary>
@@ -313,12 +316,14 @@ public sealed class TradingSystemService
     /// <param name="id">Trading system ID.</param>
     /// <param name="fileName">Attachment file name.</param>
     /// <param name="fileContent">File content.</param>
+    /// <param name="contentType">MIME content type.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The created document.</returns>
-    public async Task<Document> AddAttachmentAsync(
+    /// <returns>The created attachment.</returns>
+    public async Task<TradingSystemAttachment> AddAttachmentAsync(
         string id,
         string fileName,
         byte[] fileContent,
+        string contentType,
         CancellationToken cancellationToken = default)
     {
         var tradingSystem = await _repository.GetByIdAsync(id, cancellationToken);
@@ -326,51 +331,40 @@ public sealed class TradingSystemService
             throw new InvalidOperationException($"Trading system '{id}' not found.");
 
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        var extractedText = IsTextFile(extension) ? Encoding.UTF8.GetString(fileContent) : fileName;
 
-        var document = new Document
+        var attachment = new TradingSystemAttachment
         {
             Id = Guid.NewGuid().ToString(),
-            ProjectId = tradingSystem.ProjectId,
+            TradingSystemId = id,
             FileName = fileName,
             FileExtension = extension,
-            FileContent = fileContent,
+            ContentType = contentType,
             FileSizeBytes = fileContent.Length,
-            ExtractedText = extractedText,
-            Metadata = new Dictionary<string, string>
-            {
-                ["TradingSystemId"] = id,
-                ["AttachmentType"] = "true"
-            },
+            FileContent = fileContent,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var savedDoc = await _documentService.AddDocumentAsync(document, cancellationToken);
-        await _repository.AddAttachmentAsync(id, savedDoc.Id, cancellationToken);
-
-        return savedDoc;
+        return await _attachmentRepository.CreateAsync(attachment, cancellationToken);
     }
 
     /// <summary>
     /// Gets all attachments for a trading system.
     /// </summary>
-    public async Task<IReadOnlyList<Document>> GetAttachmentsAsync(
+    public Task<IReadOnlyList<TradingSystemAttachment>> GetAttachmentsAsync(
         string id,
         CancellationToken cancellationToken = default)
     {
-        var tradingSystem = await _repository.GetByIdAsync(id, cancellationToken);
-        if (tradingSystem == null)
-            return [];
+        return _attachmentRepository.GetByTradingSystemIdAsync(id, cancellationToken);
+    }
 
-        var attachments = new List<Document>();
-        foreach (var attachmentId in tradingSystem.AttachmentDocumentIds)
-        {
-            var doc = await _documentRepository.GetDocumentAsync(attachmentId, cancellationToken);
-            if (doc != null)
-                attachments.Add(doc);
-        }
-
-        return attachments;
+    /// <summary>
+    /// Gets a single attachment by ID.
+    /// </summary>
+    public Task<TradingSystemAttachment?> GetAttachmentByIdAsync(
+        string attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
     }
 
     /// <summary>
@@ -378,15 +372,14 @@ public sealed class TradingSystemService
     /// </summary>
     public async Task<bool> RemoveAttachmentAsync(
         string id,
-        string attachmentDocumentId,
+        string attachmentId,
         CancellationToken cancellationToken = default)
     {
-        var result = await _repository.RemoveAttachmentAsync(id, attachmentDocumentId, cancellationToken);
-        if (result == null)
+        var attachment = await _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
+        if (attachment == null || attachment.TradingSystemId != id)
             return false;
 
-        await _documentService.DeleteDocumentAsync(attachmentDocumentId, cancellationToken);
-        return true;
+        return await _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);
     }
 
     /// <summary>
@@ -404,11 +397,8 @@ public sealed class TradingSystemService
             await _documentService.DeleteDocumentAsync(tradingSystem.CodeDocumentId, cancellationToken);
         }
 
-        // Delete attachments
-        foreach (var attachmentId in tradingSystem.AttachmentDocumentIds)
-        {
-            await _documentService.DeleteDocumentAsync(attachmentId, cancellationToken);
-        }
+        // Delete all attachments
+        await _attachmentRepository.DeleteByTradingSystemIdAsync(id, cancellationToken);
 
         return await _repository.DeleteAsync(id, cancellationToken);
     }

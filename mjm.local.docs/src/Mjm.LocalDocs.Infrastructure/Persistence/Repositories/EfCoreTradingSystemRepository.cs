@@ -47,10 +47,11 @@ public sealed class EfCoreTradingSystemRepository : ITradingSystemRepository
     {
         var entities = await _context.TradingSystems
             .AsNoTracking()
-            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities
+            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
+            .Select(MapToModel).ToList();
     }
 
     /// <inheritdoc />
@@ -61,10 +62,11 @@ public sealed class EfCoreTradingSystemRepository : ITradingSystemRepository
         var entities = await _context.TradingSystems
             .AsNoTracking()
             .Where(t => t.Status == status)
-            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities
+            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
+            .Select(MapToModel).ToList();
     }
 
     /// <inheritdoc />
@@ -75,10 +77,11 @@ public sealed class EfCoreTradingSystemRepository : ITradingSystemRepository
         var entities = await _context.TradingSystems
             .AsNoTracking()
             .Where(t => t.ProjectId == projectId)
-            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities
+            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
+            .Select(MapToModel).ToList();
     }
 
     /// <inheritdoc />
@@ -92,10 +95,11 @@ public sealed class EfCoreTradingSystemRepository : ITradingSystemRepository
             .Where(t => t.Name.ToLower().Contains(lowerTerm) ||
                         (t.Description != null && t.Description.ToLower().Contains(lowerTerm)) ||
                         (t.Notes != null && t.Notes.ToLower().Contains(lowerTerm)))
-            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities
+            .OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt)
+            .Select(MapToModel).ToList();
     }
 
     /// <inheritdoc />
