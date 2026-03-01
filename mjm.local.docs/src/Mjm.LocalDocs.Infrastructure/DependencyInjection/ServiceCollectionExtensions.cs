@@ -114,6 +114,7 @@ public static class ServiceCollectionExtensions
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
+                services.AddScoped<ITradingSystemRepository, EfCoreTradingSystemRepository>();
                 services.AddSingleton<IVectorStore>(sp =>
                     new SqliteVectorStore(connectionString, embeddingDimension));
                 break;
@@ -135,6 +136,7 @@ public static class ServiceCollectionExtensions
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
+                services.AddScoped<ITradingSystemRepository, EfCoreTradingSystemRepository>();
 
                 // Use HNSW for vector search instead of brute-force SQLite
                 services.AddSingleton<IVectorStore>(sp =>
@@ -165,7 +167,8 @@ public static class ServiceCollectionExtensions
                 services.AddScoped<IProjectRepository, EfCoreProjectRepository>();
                 services.AddScoped<IDocumentRepository, EfCoreDocumentRepository>();
                 services.AddScoped<IApiTokenRepository, EfCoreApiTokenRepository>();
-                
+                services.AddScoped<ITradingSystemRepository, EfCoreTradingSystemRepository>();
+
                 // Use raw SQL vector store with separate chunk_embeddings table
                 // Pass SqlServerOptions to support custom schema, table name, and index settings
                 services.AddSingleton<IVectorStore>(sp =>
@@ -177,6 +180,7 @@ public static class ServiceCollectionExtensions
                 services.AddSingleton<IProjectRepository, InMemoryProjectRepository>();
                 services.AddSingleton<IDocumentRepository, InMemoryDocumentRepository>();
                 services.AddSingleton<IApiTokenRepository, InMemoryApiTokenRepository>();
+                services.AddSingleton<ITradingSystemRepository, InMemoryTradingSystemRepository>();
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 break;
         }

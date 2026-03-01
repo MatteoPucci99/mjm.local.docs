@@ -167,6 +167,53 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
                     b.ToTable("Projects", (string)null);
                 });
 
+            modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36);
+
+                    b.Property<string>("AttachmentDocumentIdsJson");
+
+                    b.Property<string>("CodeDocumentId")
+                        .HasMaxLength(36);
+
+                    b.Property<DateTimeOffset>("CreatedAt");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200);
+
+                    b.Property<string>("Notes");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(36);
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(1000);
+
+                    b.Property<int>("Status");
+
+                    b.Property<string>("TagsJson");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeDocumentId");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("TradingSystems", (string)null);
+                });
+
             modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.DocumentChunkEntity", b =>
                 {
                     b.HasOne("Mjm.LocalDocs.Infrastructure.Persistence.Entities.DocumentEntity", "Document")
@@ -197,6 +244,24 @@ namespace Mjm.LocalDocs.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.ProjectEntity", b =>
                 {
                     b.Navigation("Documents");
+                });
+
+            modelBuilder.Entity("Mjm.LocalDocs.Infrastructure.Persistence.Entities.TradingSystemEntity", b =>
+                {
+                    b.HasOne("Mjm.LocalDocs.Infrastructure.Persistence.Entities.DocumentEntity", "CodeDocument")
+                        .WithMany()
+                        .HasForeignKey("CodeDocumentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Mjm.LocalDocs.Infrastructure.Persistence.Entities.ProjectEntity", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CodeDocument");
+
+                    b.Navigation("Project");
                 });
 #pragma warning restore 612, 618
         }

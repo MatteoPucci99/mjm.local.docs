@@ -13,6 +13,9 @@ import DashboardPage from './pages/DashboardPage';
 import ProjectListPage from './pages/projects/ProjectListPage';
 import ProjectNewPage from './pages/projects/ProjectNewPage';
 import ProjectDetailPage from './pages/projects/ProjectDetailPage';
+import TradingSystemListPage from './pages/trading-systems/TradingSystemListPage';
+import TradingSystemNewPage from './pages/trading-systems/TradingSystemNewPage';
+import TradingSystemDetailPage from './pages/trading-systems/TradingSystemDetailPage';
 import McpConfigPage from './pages/McpConfigPage';
 import ApiTokensPage from './pages/settings/ApiTokensPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -47,6 +50,9 @@ export default function App() {
                     <Route path="/projects" element={<ProjectListPage />} />
                     <Route path="/projects/new" element={<ProjectNewPage />} />
                     <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+                    <Route path="/trading-systems" element={<TradingSystemListPage />} />
+                    <Route path="/trading-systems/new" element={<TradingSystemNewPage />} />
+                    <Route path="/trading-systems/:id" element={<TradingSystemDetailPage />} />
                     <Route path="/mcp-config" element={<McpConfigPage />} />
                     <Route path="/settings/tokens" element={<ApiTokensPage />} />
                   </Route>

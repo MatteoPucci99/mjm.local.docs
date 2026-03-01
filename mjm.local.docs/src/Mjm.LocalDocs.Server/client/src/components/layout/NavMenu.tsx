@@ -8,6 +8,7 @@ import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import FolderCopyRoundedIcon from '@mui/icons-material/FolderCopyRounded';
+import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
 import HubRoundedIcon from '@mui/icons-material/HubRounded';
 import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -19,6 +20,7 @@ interface NavMenuProps {
 const mainMenu = [
   { text: 'Dashboard', icon: <GridViewRoundedIcon />, path: '/' },
   { text: 'Projects', icon: <FolderCopyRoundedIcon />, path: '/projects' },
+  { text: 'Trading Systems', icon: <ShowChartRoundedIcon />, path: '/trading-systems' },
 ];
 
 const settingsMenu = [

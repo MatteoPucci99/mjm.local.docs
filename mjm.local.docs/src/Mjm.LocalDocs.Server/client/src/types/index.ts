@@ -73,3 +73,45 @@ export interface TokensResponse {
   tokens: ApiToken[];
   mcpAuthRequired: boolean;
 }
+
+// Trading System types
+export type TradingSystemStatus =
+  | 'Draft'
+  | 'Backtesting'
+  | 'Validating'
+  | 'Validated'
+  | 'Live'
+  | 'Paused'
+  | 'Archived';
+
+export interface TradingSystem {
+  id: string;
+  name: string;
+  description: string | null;
+  sourceUrl: string | null;
+  status: TradingSystemStatus;
+  projectId: string;
+  codeDocumentId: string | null;
+  attachmentDocumentIds: string[];
+  tags: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface TradingSystemListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  status: TradingSystemStatus;
+  tags: string[];
+  hasCode: boolean;
+  attachmentCount: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface TradingSystemStatusInfo {
+  value: TradingSystemStatus;
+  label: string;
+}

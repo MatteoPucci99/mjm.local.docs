@@ -18,6 +18,7 @@ public sealed class LocalDocsDbContext : DbContext
     public DbSet<DocumentEntity> Documents => Set<DocumentEntity>();
     public DbSet<DocumentChunkEntity> DocumentChunks => Set<DocumentChunkEntity>();
     public DbSet<ApiTokenEntity> ApiTokens => Set<ApiTokenEntity>();
+    public DbSet<TradingSystemEntity> TradingSystems => Set<TradingSystemEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,7 @@ public sealed class LocalDocsDbContext : DbContext
         ConfigureDocument(modelBuilder);
         ConfigureDocumentChunk(modelBuilder);
         ConfigureApiToken(modelBuilder);
+        ConfigureTradingSystem(modelBuilder);
     }
 
     private static void ConfigureProject(ModelBuilder modelBuilder)
@@ -197,6 +199,63 @@ public sealed class LocalDocsDbContext : DbContext
 
             // Index on Name for uniqueness check
             entity.HasIndex(e => e.Name);
+        });
+    }
+
+    private static void ConfigureTradingSystem(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TradingSystemEntity>(entity =>
+        {
+            entity.ToTable("TradingSystems");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .IsRequired();
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.SourceUrl)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Status)
+                .IsRequired();
+
+            entity.Property(e => e.ProjectId)
+                .HasMaxLength(36)
+                .IsRequired();
+
+            entity.Property(e => e.CodeDocumentId)
+                .HasMaxLength(36);
+
+            entity.Property(e => e.AttachmentDocumentIdsJson);
+
+            entity.Property(e => e.TagsJson);
+
+            entity.Property(e => e.Notes);
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.ProjectId);
+
+            // Relationships
+            entity.HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CodeDocument)
+                .WithMany()
+                .HasForeignKey(e => e.CodeDocumentId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

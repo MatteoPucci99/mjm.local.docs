@@ -43,7 +43,10 @@ public static class ServiceCollectionExtensions
 
         // API Token service for MCP authentication
         services.AddScoped<ApiTokenService>();
-        
+
+        // Trading System service
+        services.AddScoped<TradingSystemService>();
+
         return services;
     }
 }
